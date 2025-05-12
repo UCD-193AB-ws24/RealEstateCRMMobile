@@ -11,26 +11,99 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
+import { useTheme } from '@react-navigation/native';
 
 const SERVER_URL = "http://34.31.159.135:5002";
 
-const StatCard = ({ label, value, iconName, bgColor, iconColor }) => (
-  <View style={styles.statCard}>
+const StatCard = ({ label, value, iconName, bgColor, iconColor, textColor }) => (
+  <View style={[styles.statCard, { backgroundColor: textColor.card }]}> 
     <View style={styles.cardHeader}>
-      <Text style={styles.cardLabel}>{label}</Text>
-      <View style={[styles.iconCircle, { backgroundColor: bgColor }]}>
-        <Ionicons name={iconName} size={16} color={iconColor} />
+      <Text style={[styles.cardLabel, { color: textColor.text }]}>{label}</Text>
+      <View style={[styles.iconCircle, { backgroundColor: bgColor }]}> 
+        <Ionicons name={iconName} size={14} color={iconColor} />
       </View>
     </View>
-    <View style={styles.divider} />
-    <Text style={styles.cardValue}>{value}</Text>
+    <View style={[styles.divider, { backgroundColor: textColor.divider }]} />
+    <Text style={[styles.cardValue, { color: textColor.text }]}>{value}</Text>
   </View>
 );
+
+export default function HomeScreen({ navigation }) {
+  const { colors } = useTheme();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(firebaseUser);
+
+      try {
+        const storedUser = await SecureStore.getItemAsync("user");
+        const parsedUser = JSON.parse(storedUser);
+        const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
+
+        const res = await fetch(statsUrl);
+        const data = await res.json();
+        setStats(data);
+      } catch (err) {
+        console.error('❌ Error fetching stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#7C3AED" />
+          <Text style={{ color: colors.text, fontSize: 16, marginTop: 10 }}>Loading stats...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {user && <Text style={[styles.welcomeText, { color: colors.text }]}>Hello, {user.displayName || 'User'}</Text>}
+
+        {stats && (
+          <View style={styles.grid}>
+            <StatCard label="Total Leads" value={stats.totalLeads} iconName="target-outline" bgColor="#EDE9FE" iconColor="#7C3AED" textColor={colors} />
+            <StatCard label="Deals Closed" value={stats.dealsClosed} iconName="hand-left-outline" bgColor="#E0E7FF" iconColor="#4F46E5" textColor={colors} />
+            <StatCard label="Properties Contacted" value={stats.propertiesContacted} iconName="call-outline" bgColor="#E0F2FE" iconColor="#0284C7" textColor={colors} />
+            <StatCard label="Offers Made" value={stats.offersMade} iconName="business-outline" bgColor="#FEF3C7" iconColor="#D97706" textColor={colors} />
+            <StatCard label="Active Listings" value={stats.activeListings} iconName="home-outline" bgColor="#D1FAE5" iconColor="#059669" textColor={colors} />
+            <StatCard label="% Deals Closed" value={stats.percentageDealsClosed} iconName="stats-chart-outline" bgColor="#FFE4E6" iconColor="#E11D48" textColor={colors} />
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('AddProperty')}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="white" />
+          <Text style={styles.buttonText}>Add an Address</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
   },
   scrollContent: {
     padding: 20,
@@ -40,7 +113,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 24,
     textAlign: "center",
-    color: "#1F2937",
   },
   grid: {
     flexDirection: "row",
@@ -64,7 +136,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "48%",
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -82,7 +153,6 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1F2937",
   },
   iconCircle: {
     height: 28,
@@ -93,92 +163,10 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#E5E7EB",
     marginVertical: 12,
   },
   cardValue: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#000000",
   },
 });
-
-
-export default function HomeScreen({ navigation }) {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (!firebaseUser) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-  
-      setUser(firebaseUser);
-  
-      try {
-        const storedUser = await SecureStore.getItemAsync("user");
-        const parsedUser = JSON.parse(storedUser);
-        const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
-  
-        console.log('🌐 Fetching stats from:', statsUrl);
-  
-        const res = await fetch(statsUrl);
-        const data = await res.json();
-        console.log('✅ Stats received:', data);
-        setStats(data);
-      } catch (err) {
-        console.error('❌ Error fetching stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    });
-  
-    return unsubscribe;
-  }, []);
-
-  
-  
-  
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeContainer}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text style={{ color: '#7C3AED', fontSize: 16, marginTop: 10 }}>Loading stats...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.safeContainer}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {user && <Text style={styles.welcomeText}>Hello, {user.displayName || 'User'}</Text>}
-        
-        {stats && (
-          <View style={styles.grid}>
-          <StatCard label="Total Leads" value={stats.totalLeads} iconName="target-outline" bgColor="#EDE9FE" iconColor="#7C3AED" />
-          <StatCard label="Deals Closed" value={stats.dealsClosed} iconName="hand-left-outline" bgColor="#E0E7FF" iconColor="#4F46E5" />
-          <StatCard label="Properties Contacted" value={stats.propertiesContacted} iconName="call-outline" bgColor="#E0F2FE" iconColor="#0284C7" />
-          <StatCard label="Offers Made" value={stats.offersMade} iconName="business-outline" bgColor="#FEF3C7" iconColor="#D97706" />
-          <StatCard label="Active Listings" value={stats.activeListings} iconName="home-outline" bgColor="#D1FAE5" iconColor="#059669" />
-          <StatCard label="% Deals Closed" value={stats.percentageDealsClosed} iconName="stats-chart-outline" bgColor="#FFE4E6" iconColor="#E11D48" />
-        </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('AddProperty')}
-        >
-          <Ionicons name="add-circle-outline" size={20} color="white" />
-          <Text style={styles.buttonText}>Add an Address</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}

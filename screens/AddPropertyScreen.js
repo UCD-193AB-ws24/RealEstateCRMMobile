@@ -51,6 +51,26 @@ const AddPropertyScreen = () => {
     }
   };
 
+  const takePicture = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+  
+    if (permissionResult.granted === false) {
+      Alert.alert("Permission required", "Camera permission is needed to take pictures.");
+      return;
+    }
+  
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 1,
+      base64: true,
+    });
+  
+    if (!result.canceled) {
+      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      setImages((prev) => [...prev, base64Image]);
+    }
+  };
+  
+
   const getAddressFromCoords = async (latitude, longitude) => {
     try {
       const apiKey = "AIzaSyDNfQXHXoIeFVA0eSTtFJcsz1oRNc6Pe_Y";
@@ -122,9 +142,15 @@ const AddPropertyScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Add New Property</Text>
 
-        <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
-          <Text style={styles.imageButtonText}>Select Images</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <TouchableOpacity style={[styles.imageButton, { flex: 1, marginRight: 5 }]} onPress={takePicture}>
+                <Text style={styles.imageButtonText}>Take a Picture</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.imageButton, { flex: 1, marginLeft: 5 }]} onPress={pickImage}>
+                <Text style={styles.imageButtonText}>Select from Gallery</Text>
+            </TouchableOpacity>
+        </View>
 
         <ScrollView horizontal style={styles.imageScroll}>
           {images.map((imgUri, idx) => (
@@ -179,7 +205,7 @@ const styles = StyleSheet.create({
   imageScroll: { marginVertical: 10 },
   image: { width: 100, height: 100, marginRight: 10, borderRadius: 10 },
   input: { borderColor: "#ccc", borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 10 },
-  submitButton: { backgroundColor: "#10B981", padding: 15, borderRadius: 8, alignItems: "center", marginTop: 20 },
+  submitButton: { backgroundColor: "#7C3AED", padding: 15, borderRadius: 8, alignItems: "center", marginTop: 20 },
   submitText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });
 

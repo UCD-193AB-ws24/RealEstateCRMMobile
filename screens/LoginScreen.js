@@ -30,12 +30,20 @@ export default function LoginScreen({ navigation }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
+  
       const savedUser = await res.json();
+  
+      // Save everything including name and picture
       await SecureStore.setItemAsync("user", JSON.stringify({
         id: savedUser.id,
         email: savedUser.email,
+        name: savedUser.name,
+        picture: savedUser.picture,
       }));
+
+      console.log(savedUser.name);
+      console.log(savedUser.picture);
+      console.log(savedUser.email);
       console.log(savedUser.id);
   
       navigation.replace("AppTabs");

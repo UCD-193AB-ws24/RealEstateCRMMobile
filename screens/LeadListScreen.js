@@ -15,10 +15,13 @@ import * as SecureStore from "expo-secure-store";
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../firebase';
 import DropDownPicker from 'react-native-dropdown-picker';
+import { signInWithGoogleAsync } from '../googleAuth';
+import { useTheme } from '@react-navigation/native';
 
 const SERVER_URL = 'http://34.31.159.135:5002';
 
 export default function LeadListScreen() {
+  const { colors } = useTheme();
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,24 @@ export default function LeadListScreen() {
     setFilteredLeads(filtered);
   }, [searchQuery, selectedCity, selectedStatus, leads]);
 
+  const handleExportPress = async () => {
+    let token = await SecureStore.getItemAsync("accessToken");
+  
+    if (!token) {
+        console.log("token not found");
+      try {
+        token = await signInWithGoogleAsync(); // triggers Google login
+        console.log(token);
+      } catch (err) {
+        Alert.alert("Login failed", "Could not get access token");
+        return;
+      }
+    }
+  
+    // now you have the access token, continue export
+    exportLeads(token);
+  };
+
   const exportLeads = async () => {
     const token = await SecureStore.getItemAsync("accessToken");
     if (!token) return Alert.alert("No token", "Please login again.");
@@ -113,16 +134,16 @@ export default function LeadListScreen() {
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate("LeadDetails", { lead: item })}
+    style={[styles.card, { backgroundColor: colors.card }]}
+    onPress={() => navigation.navigate("LeadDetails", { lead: item })}
     >
       {item.images?.[0] && (
         <Image source={{ uri: item.images[0] }} style={styles.image} resizeMode="cover" />
       )}
       <View style={styles.cardContent}>
-        <Text style={styles.address}>{item.city}</Text>
-        <Text style={styles.meta}>Owner: {item.owner}</Text>
-        <Text style={styles.meta}>Status: {item.status}</Text>
+      <Text style={[styles.address, { color: colors.text }]}>{item.city}</Text>
+        <Text style={[styles.meta, { color: colors.text }]}>{`Owner: ${item.owner}`}</Text>
+        <Text style={[styles.meta, { color: colors.text }]}>{`Status: ${item.status}`}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -137,18 +158,23 @@ export default function LeadListScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={{ flex: 1 }}>
         {/* Filters Section */}
-        <View style={[styles.headerWrapper, { zIndex: cityOpen || statusOpen ? 9999 : 1 }]}>
+        <View style={[styles.headerWrapper, { backgroundColor: colors.background }, { zIndex: cityOpen || statusOpen ? 9999 : 1 }]}>
           <View style={styles.searchContainer}>
             <TextInput
               placeholder="Search leads..."
-              style={styles.searchInput}
+              placeholderTextColor={colors.text}
+              style={[styles.searchInput, {
+                backgroundColor: colors.card,
+                color: colors.text,
+                borderColor: colors.border
+              }]}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
-            <TouchableOpacity style={styles.exportButton} onPress={exportLeads}>
+            <TouchableOpacity style={styles.exportButton} onPress={handleExportPress}>
               <Text style={styles.exportText}>Export</Text>
             </TouchableOpacity>
           </View>
@@ -163,9 +189,11 @@ export default function LeadListScreen() {
                 setValue={setSelectedCity}
                 setItems={() => {}}
                 placeholder="Filter by City"
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-            />
+                style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
+                textStyle={{ color: colors.text }}
+                dropDownContainerStyle={{ backgroundColor: colors.card, borderColor: colors.border }}
+                placeholderStyle={{ color: colors.text }}
+                />
             </View>
   
             <View style={{ flex: 1, marginLeft: 5 }}>
@@ -177,8 +205,10 @@ export default function LeadListScreen() {
                 setValue={setSelectedStatus}
                 setItems={() => {}}
                 placeholder="Filter by Status"
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
+                style={[styles.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]}
+                textStyle={{ color: colors.text }}
+                dropDownContainerStyle={{ backgroundColor: colors.card, borderColor: colors.border }}
+                placeholderStyle={{ color: colors.text }}
                 />
             </View>
           </View>
