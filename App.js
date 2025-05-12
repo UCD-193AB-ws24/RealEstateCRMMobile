@@ -12,9 +12,32 @@ import HomeScreen from './screens/HomeScreen';
 import DriveScreen from './screens/DriveScreen';
 import LeadListScreen from './screens/LeadListScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AddPropertyScreen from './screens/AddPropertyScreen';
+import LeadDetailsScreen from './screens/LeadDetailsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+const HomeStack = createNativeStackNavigator();
+const LeadsStack = createNativeStackNavigator();
+
+function LeadsStackScreen() {
+  return (
+    <LeadsStack.Navigator screenOptions={{ headerShown: true }}>
+      <LeadsStack.Screen name="LeadList" component={LeadListScreen} options={{ headerShown: false }} />
+      <LeadsStack.Screen name="LeadDetails" component={LeadDetailsScreen} options={{ title: "Lead Details", headerBackTitle: "Back", }} />
+    </LeadsStack.Navigator>
+  );
+}
+
+function HomeStackScreen() {
+  return (
+    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStack.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStack.Screen name="AddProperty" component={AddPropertyScreen} />
+    </HomeStack.Navigator>
+  );
+}
 
 // 🧭 Tabs inside a reusable function
 function AppTabs() {
@@ -36,8 +59,8 @@ function AppTabs() {
       })}
     >
       <Tab.Screen name="Drive" component={DriveScreen} />
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Leads" component={LeadListScreen} />
+      <Tab.Screen name="Home" component={HomeStackScreen} />
+      <Tab.Screen name="Leads" component={LeadsStackScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
