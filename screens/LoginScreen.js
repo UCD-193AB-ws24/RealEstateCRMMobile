@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
 
 export default function LoginScreen({ navigation }) {
@@ -9,12 +10,40 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigation.replace('Loading');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+      // await SecureStore.setItemAsync("user", JSON.stringify({
+      //   email: firebaseUser.email,
+      //   id: firebaseUser.uid, // or user.id, depending on your structure
+      // }));
+  
+      const payload = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.email.split("@")[0], // Fallback if no name
+        picture: null,
+      };
+  
+      // ✅ Sync with your backend
+      const res = await fetch("http://34.31.159.135:5002/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const savedUser = await res.json();
+      await SecureStore.setItemAsync("user", JSON.stringify({
+        id: savedUser.id,
+        email: savedUser.email,
+      }));
+      console.log(savedUser.id);
+  
+      navigation.replace("AppTabs");
     } catch (error) {
-      Alert.alert('Login Failed', error.message);
+      Alert.alert("Login Failed", error.message);
     }
   };
+  
 
   return (
     <View style={styles.container}>

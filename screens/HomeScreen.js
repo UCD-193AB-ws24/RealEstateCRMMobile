@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
 
-const SERVER_URL = "http://34.31.159.135:5001";
+const SERVER_URL = "http://34.31.159.135:5002";
 
 const StatCard = ({ label, value, iconName, bgColor, iconColor }) => (
   <View style={styles.statCard}>
@@ -109,35 +110,29 @@ export default function HomeScreen({ navigation }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-      console.log('📌 onAuthStateChanged triggered');
-      console.log('👤 Firebase User:', firebaseUser);
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
   
-      if (firebaseUser) {
-        setUser(firebaseUser);
+      setUser(firebaseUser);
   
-        const statsUrl = `${SERVER_URL}/api/stats/${firebaseUser.uid}`;
+      try {
+        const storedUser = await SecureStore.getItemAsync("user");
+        const parsedUser = JSON.parse(storedUser);
+        const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
+  
         console.log('🌐 Fetching stats from:', statsUrl);
   
-        fetch(statsUrl)
-          .then((res) => {
-            console.log('📥 Raw response:', res);
-            return res.json();
-          })
-          .then((data) => {
-            console.log('✅ Stats received:', data);
-            setStats(data);
-          })
-          .catch((err) => {
-            console.error('❌ Error fetching stats:', err);
-          })
-          .finally(() => {
-            console.log('📴 Done loading stats');
-            setLoading(false);
-          });
-      } else {
-        console.log('⚠️ No user found. Skipping stats fetch.');
-        setUser(null);
+        const res = await fetch(statsUrl);
+        const data = await res.json();
+        console.log('✅ Stats received:', data);
+        setStats(data);
+      } catch (err) {
+        console.error('❌ Error fetching stats:', err);
+      } finally {
         setLoading(false);
       }
     });
