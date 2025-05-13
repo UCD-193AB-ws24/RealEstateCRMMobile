@@ -37,7 +37,7 @@ export default function ProfileScreen() {
             <Ionicons name="person" size={50} color="white" />
         </View>
         )}
-      <Text style={styles.name}>{userData?.name || 'Anonymous'}</Text>
+      <Text style={[styles.label, { color: colors.text }]}>{userData?.name || 'Anonymous'}</Text>
       <Text style={styles.email}>{userData?.email}</Text>
 
       <View style={styles.switchRow}>

@@ -16,6 +16,9 @@ import ProfileScreen from './screens/ProfileScreen';
 import AddPropertyScreen from './screens/AddPropertyScreen';
 import LeadDetailsScreen from './screens/LeadDetailsScreen';
 
+import { LogBox } from "react-native";
+LogBox.ignoreAllLogs();
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -26,7 +29,7 @@ function LeadsStackScreen() {
   return (
     <LeadsStack.Navigator screenOptions={{ headerShown: true }}>
       <LeadsStack.Screen name="LeadList" component={LeadListScreen} options={{ headerShown: false }} />
-      <LeadsStack.Screen name="LeadDetails" component={LeadDetailsScreen} options={{ title: "Lead Details", headerBackTitle: "Back", }} />
+      <LeadsStack.Screen name="LeadDetails" component={LeadDetailsScreen} options={{ title: "Lead Details", headerBackTitle: "Back", headerTintColor: '#7C3AED' }} />
     </LeadsStack.Navigator>
   );
 }

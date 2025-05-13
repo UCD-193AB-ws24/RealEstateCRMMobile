@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
-import { useTheme } from '@react-navigation/native';
+import { useFocusEffect, useTheme } from '@react-navigation/native';
+import { SERVER_URL } from '@env';
 
-const SERVER_URL = "http://34.31.159.135:5002";
 
 const StatCard = ({ label, value, iconName, bgColor, iconColor, textColor }) => (
   <View style={[styles.statCard, { backgroundColor: textColor.card }]}> 
@@ -34,33 +34,55 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (!firebaseUser) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const storedUser = await SecureStore.getItemAsync("user");
+      const parsedUser = JSON.parse(storedUser);
+      const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
+      const res = await fetch(statsUrl);
+      const data = await res.json();
+      setStats(data);
+    } catch (err) {
+      console.error('❌ Error fetching stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 
-      setUser(firebaseUser);
-
-      try {
+  useFocusEffect(
+    useCallback(() => {
+      const loadUserAndStats = async () => {
         const storedUser = await SecureStore.getItemAsync("user");
-        const parsedUser = JSON.parse(storedUser);
-        const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
+        console.log(storedUser);
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser); // This will include the Google display name
+          await fetchStats();
+        }
+      };
+  
+      loadUserAndStats();
+    }, [])
+  );
+  
 
-        const res = await fetch(statsUrl);
-        const data = await res.json();
-        setStats(data);
-      } catch (err) {
-        console.error('❌ Error fetching stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, []);
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+  //       if (firebaseUser) {
+  //         setUser(firebaseUser);
+  //       }
+  
+  //       await fetchStats();
+  //     });
+  
+  //     return unsubscribe;
+  //   }, [])
+  // );
+  
+  
 
   if (loading) {
     return (
@@ -76,7 +98,8 @@ export default function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {user && <Text style={[styles.welcomeText, { color: colors.text }]}>Hello, {user.displayName || 'User'}</Text>}
+      {user && <Text style={[styles.welcomeText, { color: colors.text }]}>Hello, {user.name || 'User'}</Text>}
+
 
         {stats && (
           <View style={styles.grid}>
@@ -91,7 +114,7 @@ export default function HomeScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigation.navigate('AddProperty')}
+          onPress={() => navigation.navigate('AddProperty', { from: "home" })}
         >
           <Ionicons name="add-circle-outline" size={20} color="white" />
           <Text style={styles.buttonText}>Add an Address</Text>
@@ -153,6 +176,7 @@ const styles = StyleSheet.create({
   cardLabel: {
     fontSize: 14,
     fontWeight: "600",
+    flexShrink: 1, // prevent overflow
   },
   iconCircle: {
     height: 28,
@@ -160,7 +184,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-  },
+    flexShrink: 0,
+  },  
   divider: {
     height: 1,
     marginVertical: 12,

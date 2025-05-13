@@ -8,6 +8,8 @@ import {
   Image,
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -15,14 +17,19 @@ import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from '@react-navigation/native';
+import { GEOCODING_API_KEY } from '@env';
+import { SERVER_URL } from '@env';
 
-const SERVER_URL = "http://34.31.159.135:5002";
 const API_URL = `${SERVER_URL}/api/leads`;
 
 const AddPropertyScreen = () => {
+    const { colors } = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
-  const { latitude, longitude } = route.params || {};
+  const { from, location } = route.params || {};
+const latitude = location?.latitude;
+const longitude = location?.longitude;
 
   const [name, setName] = useState("");
   const [images, setImages] = useState([]);
@@ -34,20 +41,71 @@ const AddPropertyScreen = () => {
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (latitude && longitude) {
-      getAddressFromCoords(latitude, longitude);
+    console.log("Route params on load:", route.params);
+  }, []);
+
+  useEffect(() => {
+  const initFromParams = async () => {
+    const { from, location } = route.params || {};
+
+    if (from === "drive" && location?.latitude && location?.longitude) {
+      console.log("📍 Using location from drive route params");
+      getAddressFromCoords(location.latitude, location.longitude);
     }
-  }, [latitude, longitude]);
+
+    // fallback to current location if from drive but no coords provided
+    if (from === "drive" && (!location || !location.latitude || !location.longitude)) {
+      console.log("📍 Fallback: fetching current location");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({});
+        getAddressFromCoords(loc.coords.latitude, loc.coords.longitude);
+      }
+    }
+  };
+
+  initFromParams();
+}, [route.params]);
+
+const extractDecimalCoords = (exif) => {
+    let lat = exif.GPSLatitude;
+    let lng = exif.GPSLongitude;
+  
+    if (typeof lat === "number" && typeof lng === "number") {
+      if (exif.GPSLatitudeRef === "S") lat = -lat;
+      if (exif.GPSLongitudeRef === "W") lng = -lng;
+      return { lat, lng };
+    }
+  
+    return null;
+  };
+
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsMultipleSelection: true,
       quality: 1,
       base64: true,
+      exif: true,
     });
+  
     if (!result.canceled) {
       const base64Images = result.assets.map((asset) => `data:image/jpeg;base64,${asset.base64}`);
       setImages((prev) => [...prev, ...base64Images]);
+
+      console.log("EXIF Metadata:", result.assets[0].exif);
+  
+      if (
+        route.params?.from === "home" &&
+        result.assets[0]?.exif?.GPSLatitude &&
+        result.assets[0]?.exif?.GPSLongitude
+      ) {
+        const coords = extractDecimalCoords(result.assets[0].exif);
+        if (coords) {
+          console.log("📍 EXIF-based location:", coords);
+          getAddressFromCoords(coords.lat, coords.lng);
+        }
+      }
     }
   };
 
@@ -73,8 +131,7 @@ const AddPropertyScreen = () => {
 
   const getAddressFromCoords = async (latitude, longitude) => {
     try {
-      const apiKey = "AIzaSyDNfQXHXoIeFVA0eSTtFJcsz1oRNc6Pe_Y";
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GEOCODING_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.status === "OK") {
@@ -130,7 +187,7 @@ const AddPropertyScreen = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Add failed");
       Alert.alert("Success", "Property added successfully!");
-      navigation.goBack();
+      navigation.navigate("Leads", { refresh: true });
     } catch (err) {
       console.error("Error adding property:", err);
       Alert.alert("Error", "Failed to add property.");
@@ -138,61 +195,84 @@ const AddPropertyScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Add New Property</Text>
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    keyboardVerticalOffset={Platform.OS === 'ios' ? 5 : 0} // tweak if header present
+  >
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Add New Property</Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-            <TouchableOpacity style={[styles.imageButton, { flex: 1, marginRight: 5 }]} onPress={takePicture}>
-                <Text style={styles.imageButtonText}>Take a Picture</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={[styles.imageButton, { flex: 1, marginRight: 5 }]} onPress={takePicture}>
+            <Text style={styles.imageButtonText}>Take a Picture</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.imageButton, { flex: 1, marginLeft: 5 }]} onPress={pickImage}>
-                <Text style={styles.imageButtonText}>Select from Gallery</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={[styles.imageButton, { flex: 1, marginLeft: 5 }]} onPress={pickImage}>
+            <Text style={styles.imageButtonText}>Select from Gallery</Text>
+        </TouchableOpacity>
         </View>
 
         <ScrollView horizontal style={styles.imageScroll}>
-          {images.map((imgUri, idx) => (
-            <Image key={idx} source={{ uri: imgUri }} style={styles.image} />
-          ))}
+        {images.map((imgUri, idx) => (
+            <View key={idx} style={{ position: "relative", marginRight: 10 }}>
+            <Image source={{ uri: imgUri }} style={styles.image} />
+            <TouchableOpacity
+                onPress={() => {
+                setImages(prev => prev.filter((_, i) => i !== idx));
+                }}
+                style={styles.removeButton}
+            >
+                <Text style={{ color: "white", fontWeight: "bold" }}>✕</Text>
+            </TouchableOpacity>
+            </View>
+        ))}
         </ScrollView>
 
-        {[{
-          label: "Name", val: name, set: setName,
-        }, {
-          label: "Address", val: address, set: setAddress,
-        }, {
-          label: "City", val: city, set: setCity,
-        }, {
-          label: "State", val: state, set: setState,
-        }, {
-          label: "Zip", val: zip, set: setZip,
-        }, {
-          label: "Owner", val: owner, set: setOwner,
-        }].map(({ label, val, set }, idx) => (
-          <TextInput
+        {[
+        { label: "Name", val: name, set: setName },
+        { label: "Address", val: address, set: setAddress },
+        { label: "City", val: city, set: setCity },
+        { label: "State", val: state, set: setState },
+        { label: "Zip", val: zip, set: setZip },
+        { label: "Owner", val: owner, set: setOwner },
+        ].map(({ label, val, set }, idx) => (
+        <TextInput
             key={idx}
             placeholder={label}
-            style={styles.input}
+            placeholderTextColor='#9CA3AF'
+            style={[styles.input, {
+            borderColor: colors.border,
+            color: colors.text,
+            backgroundColor: colors.card,
+            }]}
             value={val}
             onChangeText={set}
-          />
+        />
         ))}
 
         <TextInput
-          placeholder="Notes"
-          multiline
-          value={notes}
-          onChangeText={setNotes}
-          style={[styles.input, { height: 80 }]}
+        placeholder="Notes"
+        placeholderTextColor='#9CA3AF'
+        multiline
+        value={notes}
+        onChangeText={setNotes}
+        style={[styles.input, {
+            height: 80,
+            borderColor: colors.border,
+            color: colors.text,
+            backgroundColor: colors.card,
+        }]}
         />
 
         <TouchableOpacity style={styles.submitButton} onPress={handleAddProperty}>
-          <Text style={styles.submitText}>Submit</Text>
+        <Text style={styles.submitText}>Submit</Text>
         </TouchableOpacity>
-      </ScrollView>
+    </ScrollView>
+    </KeyboardAvoidingView>
     </SafeAreaView>
+
   );
 };
 
@@ -207,6 +287,19 @@ const styles = StyleSheet.create({
   input: { borderColor: "#ccc", borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 10 },
   submitButton: { backgroundColor: "#7C3AED", padding: 15, borderRadius: 8, alignItems: "center", marginTop: 20 },
   submitText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  removeButton: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  
 });
 
 export default AddPropertyScreen;
