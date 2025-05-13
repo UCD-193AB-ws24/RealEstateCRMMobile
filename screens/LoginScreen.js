@@ -3,6 +3,9 @@ import { View, TextInput, Button, Text, Alert, StyleSheet, TouchableOpacity } fr
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
+import { SERVER_URL } from '@env';
+
+const API_URL = `${SERVER_URL}/api/users`;
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -25,7 +28,7 @@ export default function LoginScreen({ navigation }) {
       };
   
       // ✅ Sync with your backend
-      const res = await fetch("http://34.31.159.135:5002/api/users", {
+      const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

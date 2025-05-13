@@ -44,6 +44,7 @@ export default function DriveScreen() {
         navigation.navigate('Home', {
             screen: 'AddProperty',
             params: {
+            from: "drive",
               location: {
                 latitude: location.latitude,
                 longitude: location.longitude,
