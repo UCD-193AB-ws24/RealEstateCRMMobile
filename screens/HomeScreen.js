@@ -147,7 +147,7 @@ export default function HomeScreen({ navigation }) {
       >
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../assets/images/gemini_logo.png')} 
+            source={require('../assets/gemini_logo.png')} 
             style={styles.geminiLogo}
           />
         </View>
