@@ -6,6 +6,7 @@ import { auth } from '../firebase';
 import { SERVER_URL } from '@env';
 
 const API_URL = `${SERVER_URL}/api/users`;
+console.log(API_URL);
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ export default function LoginScreen({ navigation }) {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = result.user;
+      console.log('firebase user', firebaseUser);
       // await SecureStore.setItemAsync("user", JSON.stringify({
       //   email: firebaseUser.email,
       //   id: firebaseUser.uid, // or user.id, depending on your structure
@@ -26,6 +28,8 @@ export default function LoginScreen({ navigation }) {
         name: firebaseUser.email.split("@")[0], // Fallback if no name
         picture: null,
       };
+
+      console.log("here");
   
       // ✅ Sync with your backend
       const res = await fetch(API_URL, {
@@ -35,6 +39,7 @@ export default function LoginScreen({ navigation }) {
       });
   
       const savedUser = await res.json();
+      console.log('result', res);
   
       // Save everything including name and picture
       await SecureStore.setItemAsync("user", JSON.stringify({

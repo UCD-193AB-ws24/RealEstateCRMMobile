@@ -17,7 +17,7 @@ import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/nativ
 import { useCallback } from 'react';
 import { auth } from '../firebase';
 import DropDownPicker from 'react-native-dropdown-picker';
-import { signInWithGoogleAsync } from '../googleAuth';
+import { useGoogleAuth } from '../googleAuth';
 import { useTheme } from '@react-navigation/native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -50,6 +50,8 @@ export default function LeadListScreen() {
   const route = useRoute();
   const mapRef = useRef(null);
 
+  const { accessToken, promptAsync, isRequestReady } = useGoogleAuth();
+
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -74,11 +76,14 @@ export default function LeadListScreen() {
       const storedUser = await SecureStore.getItemAsync("user");
       const parsedUser = JSON.parse(storedUser);
       const url = `${SERVER_URL}/api/leads/${parsedUser.id}`;
-  
       const response = await fetch(url);
       const data = await response.json();
   
-      // Enrich leads with missing coordinates
+      setLeads(data); // Show raw data immediately
+      setFilteredLeads(data);
+      setCities([...new Set(data.map((l) => l.city).filter(Boolean))]);
+  
+      // Start enriching in background
       const enriched = await Promise.all(
         data.map(async (lead) => {
           if (!lead.latitude || !lead.longitude) {
@@ -90,9 +95,12 @@ export default function LeadListScreen() {
         })
       );
   
+      // Replace once enriched
       setLeads(enriched);
       setFilteredLeads(enriched);
-      setCities([...new Set(enriched.map((l) => l.city).filter(Boolean))]);
+
+      await AsyncStorage.setItem('@cachedLeads', JSON.stringify(enriched));
+
     } catch (err) {
       console.error("❌ Error fetching leads:", err);
     } finally {
@@ -100,12 +108,25 @@ export default function LeadListScreen() {
     }
   };
   
+  
 
   useFocusEffect(
     useCallback(() => {
-      fetchLeads();
+      const loadCachedLeads = async () => {
+        const cached = await AsyncStorage.getItem('@cachedLeads');
+        if (cached) {
+          const cachedLeads = JSON.parse(cached);
+          setLeads(cachedLeads);
+          setFilteredLeads(cachedLeads);
+          setCities([...new Set(cachedLeads.map((l) => l.city).filter(Boolean))]);
+          setLoading(false); // so UI renders right away
+        }
+      };
+      loadCachedLeads();
+      fetchLeads(); // Fetch fresh data in background
     }, [])
   );
+  
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
@@ -115,8 +136,10 @@ export default function LeadListScreen() {
         const storedUser = await SecureStore.getItemAsync("user");
         const parsedUser = JSON.parse(storedUser);
         const url = `${SERVER_URL}/api/leads/${parsedUser.id}`;
+        console.log('url', url);
 
         const response = await fetch(url);
+        console.log('response', response);
         if (!response.ok) throw new Error('Failed to fetch leads');
 
         const data = await response.json();
@@ -144,20 +167,18 @@ export default function LeadListScreen() {
   }, [searchQuery, selectedCity, selectedStatus, leads]);
 
   const handleExportPress = async () => {
-    let token = await SecureStore.getItemAsync("accessToken");
-  
-    if (!token) {
-        console.log("token not found");
-      try {
-        token = await signInWithGoogleAsync(); // triggers Google login
-        console.log(token);
-      } catch (err) {
-        Alert.alert("Login failed", "Could not get access token");
-        return;
-      }
+    let token = accessToken;
+
+    if (!token && isRequestReady) {
+      const result = await promptAsync(); // launches Google login
+      return; // wait for useEffect to get the token, then retry
     }
-  
-    // now you have the access token, continue export
+
+    if (!token) {
+      Alert.alert("Login Required", "Please sign in with Google first.");
+      return;
+    }
+
     exportLeads(token);
   };
 
@@ -244,15 +265,6 @@ export default function LeadListScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color="#7C3AED" />
-        <Text>Loading leads...</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={{ flex: 1 }}>
@@ -328,6 +340,14 @@ export default function LeadListScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
+        ListFooterComponent={
+          loading ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#7C3AED" />
+              <Text>Loading leads...</Text>
+            </View>
+          ) : null
+        }
     />
     ) : (
     <>
