@@ -1,52 +1,54 @@
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import * as SecureStore from 'expo-secure-store';
-import { CLIENT_ID } from '@env';
-import { REDIRECT_URI } from '@env';
+// utils/useGoogleAuth.js
+
+import { useEffect, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import * as SecureStore from "expo-secure-store";
+import * as AuthSession from "expo-auth-session";
+import { ANDROID_ID } from "@env";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-};
+export function useGoogleAuth() {
+  const [accessToken, setAccessToken] = useState(null);
 
-export async function signInWithGoogleAsync() {
-  try {
-    const request = new AuthSession.AuthRequest({
-      clientId: CLIENT_ID,
-      scopes: [
-        'https://www.googleapis.com/auth/spreadsheets',
-        'https://www.googleapis.com/auth/drive',
-      ],
-      redirectUri: REDIRECT_URI,
-      usePKCE: true,
-    });
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: ANDROID_ID,
+    scopes: [
+      "openid",
+      "profile",
+      "email",
+      "https://www.googleapis.com/auth/spreadsheets",
+    ],
+  });
 
-    const result = await request.promptAsync(discovery, { useProxy: true });
+  console.log("🔁 Redirect URI:", AuthSession.makeRedirectUri({ useProxy: true }));
 
-    if (result.type !== 'success') {
-      throw new Error('Authentication failed');
-    }
 
-    const tokenResponse = await AuthSession.exchangeCodeAsync(
-      {
-        code: result.params.code,
-        clientId: CLIENT_ID,
-        redirectUri: REDIRECT_URI,
-        codeVerifier: request.codeVerifier,
-      },
-      discovery
-    );
+  useEffect(() => {
+    const checkStoredToken = async () => {
+      const token = await SecureStore.getItemAsync("accessToken");
+      if (token) {
+        setAccessToken(token);
+      }
+    };
+    checkStoredToken();
+  }, []);
 
-    if (!tokenResponse.accessToken) {
-      throw new Error('No access token received');
-    }
+  useEffect(() => {
+    const handleResponse = async () => {
+      if (response?.type === "success") {
+        const token = response.authentication.accessToken;
+        setAccessToken(token);
+        await SecureStore.setItemAsync("accessToken", token);
+      }
+    };
+    handleResponse();
+  }, [response]);
 
-    await SecureStore.setItemAsync('accessToken', tokenResponse.accessToken);
-    return tokenResponse.accessToken;
-  } catch (e) {
-    console.error('❌ Google login failed:', e);
-    throw e;
-  }
+  return {
+    accessToken,
+    promptAsync,
+    isRequestReady: !!request,
+  };
 }

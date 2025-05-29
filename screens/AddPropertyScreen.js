@@ -185,6 +185,7 @@ const extractDecimalCoords = (exif) => {
         body: JSON.stringify(newLead),
       });
       const data = await response.json();
+      console.log(response);
       if (!response.ok) throw new Error(data.error || "Add failed");
       Alert.alert("Success", "Property added successfully!");
       navigation.navigate("Leads", { refresh: true });
