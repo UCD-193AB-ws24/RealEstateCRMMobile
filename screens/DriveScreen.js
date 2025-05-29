@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
@@ -58,7 +58,7 @@ export default function DriveScreen() {
     <View style={styles.container}>
       {location && (
         <MapView
-        provider="google"
+          provider="google"
           ref={mapRef}
           style={styles.map}
           initialRegion={{
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   fab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: Platform.OS === 'android' ? 40 : 20,
     right: 20,
     backgroundColor: '#7C3AED',
     borderRadius: 50,

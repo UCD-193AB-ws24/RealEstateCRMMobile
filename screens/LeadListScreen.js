@@ -11,6 +11,8 @@ import {
   Image,
   Alert,
   Switch,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import * as SecureStore from "expo-secure-store";
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
@@ -246,15 +248,23 @@ export default function LeadListScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centered}>
+      <SafeAreaView style={[styles.centered, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar
+          barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
+          backgroundColor={colors.background}
+        />
         <ActivityIndicator size="large" color="#7C3AED" />
-        <Text>Loading leads...</Text>
+        <Text style={{ color: colors.text }}>Loading leads...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar
+        barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
+        backgroundColor={colors.background}
+      />
       <View style={{ flex: 1 }}>
         {/* Filters Section */}
         <View style={[styles.headerWrapper, { backgroundColor: colors.background }, { zIndex: cityOpen || statusOpen ? 9999 : 1 }]}>
@@ -409,8 +419,17 @@ export default function LeadListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F9FAFB',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  centered: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
   list: { padding: 16 },
   card: {
     backgroundColor: '#fff',

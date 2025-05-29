@@ -10,6 +10,8 @@ import {
   TextInput,
   Modal,
   Image,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from "expo-secure-store";
@@ -106,7 +108,11 @@ export default function HomeScreen({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
+      <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar
+          barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
+          backgroundColor={colors.background}
+        />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#7C3AED" />
           <Text style={{ color: colors.text, fontSize: 16, marginTop: 10 }}>Loading stats...</Text>
@@ -116,7 +122,11 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar
+        barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
+        backgroundColor={colors.background}
+      />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {user && <Text style={[styles.welcomeText, { color: colors.text }]}>Hello, {user.name || 'User'}</Text>}
 
@@ -215,6 +225,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   scrollContent: {
     padding: 20,
