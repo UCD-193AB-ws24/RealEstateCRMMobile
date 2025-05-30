@@ -5,7 +5,6 @@ import {
   FlatList,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Image,
@@ -26,6 +25,8 @@ import { Dimensions } from 'react-native';
 import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
 import * as Linking from 'expo-linking';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 
 

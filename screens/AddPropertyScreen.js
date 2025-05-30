@@ -20,6 +20,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from '@react-navigation/native';
 import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
+import * as ImageManipulator from 'expo-image-manipulator';
+
 
 const API_URL = `${SERVER_URL}/api/leads`;
 
@@ -85,15 +87,29 @@ const extractDecimalCoords = (exif) => {
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsMultipleSelection: true,
       quality: 1,
-      base64: true,
+      base64: false,
       exif: true,
     });
   
-    if (!result.canceled) {
-      const base64Images = result.assets.map((asset) => `data:image/jpeg;base64,${asset.base64}`);
-      setImages((prev) => [...prev, ...base64Images]);
-
-      console.log("EXIF Metadata:", result.assets[0].exif);
+    if (!result.canceled && result.assets.length > 0) {
+      const resizedBase64Images = await Promise.all(
+        result.assets.map(async (asset) => {
+          try {
+            const resized = await ImageManipulator.manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 800 } }],
+              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+            );
+            return `data:image/jpeg;base64,${resized.base64}`;
+          } catch (e) {
+            console.error('❌ Image resize failed:', e);
+            return null;
+          }
+        })
+      );
+  
+      const validImages = resizedBase64Images.filter(Boolean);
+      setImages((prev) => [...prev, ...validImages]);
   
       if (
         route.params?.from === "home" &&
@@ -108,25 +124,38 @@ const extractDecimalCoords = (exif) => {
       }
     }
   };
+  
 
   const takePicture = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
   
-    if (permissionResult.granted === false) {
+    if (!permissionResult.granted) {
       Alert.alert("Permission required", "Camera permission is needed to take pictures.");
       return;
     }
   
     const result = await ImagePicker.launchCameraAsync({
       quality: 1,
-      base64: true,
+      base64: false,
     });
   
-    if (!result.canceled) {
-      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      setImages((prev) => [...prev, base64Image]);
+    if (!result.canceled && result.assets[0]?.uri) {
+      try {
+        const resized = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 800 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+  
+        const base64Image = `data:image/jpeg;base64,${resized.base64}`;
+        setImages((prev) => [...prev, base64Image]);
+      } catch (e) {
+        console.error('❌ Failed to resize captured image:', e);
+        Alert.alert("Error", "Failed to process photo.");
+      }
     }
   };
+  
   
 
   const getAddressFromCoords = async (latitude, longitude) => {

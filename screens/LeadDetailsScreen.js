@@ -8,6 +8,7 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SERVER_URL } from '@env';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const API_URL = `${SERVER_URL}/api/leads`;
 
@@ -28,12 +29,31 @@ export default function LeadDetailScreen({ route }) {
   ]);
 
   const handleImagePick = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ base64: true });
-    if (!result.canceled) {
-      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      setUpdatedLead(prev => ({ ...prev, images: [...prev.images, base64Image] }));
+    const result = await ImagePicker.launchImageLibraryAsync({
+      base64: false,
+      allowsEditing: false,
+      quality: 1,
+    });
+  
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      const originalUri = result.assets[0].uri;
+  
+      try {
+        const resized = await ImageManipulator.manipulateAsync(
+          originalUri,
+          [{ resize: { width: 800 } }], // resize to 800px wide
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+  
+        const base64Image = `data:image/jpeg;base64,${resized.base64}`;
+        setUpdatedLead(prev => ({ ...prev, images: [...(prev.images || []), base64Image] }));
+      } catch (e) {
+        console.error('❌ Error resizing image:', e);
+        Alert.alert("Image Error", "Could not process the image.");
+      }
     }
   };
+  
   
 
   const handleImageRemove = (index) => {
