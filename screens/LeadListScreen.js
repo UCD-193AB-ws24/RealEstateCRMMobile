@@ -11,6 +11,7 @@ import {
   Image,
   Alert,
   Switch,
+  Modal
 } from 'react-native';
 import * as SecureStore from "expo-secure-store";
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
@@ -25,7 +26,6 @@ import { Dimensions } from 'react-native';
 import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
 import * as Linking from 'expo-linking';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -52,6 +52,9 @@ export default function LeadListScreen() {
 
   const route = useRoute();
   const mapRef = useRef(null);
+  const [sheetModalVisible, setSheetModalVisible] = useState(false);
+  const [sheetTitle, setSheetTitle] = useState('');
+
 
 
   useEffect(() => {
@@ -80,22 +83,20 @@ export default function LeadListScreen() {
       const url = `${SERVER_URL}/api/leads/${parsedUser.id}`;
       const response = await fetch(url);
       const data = await response.json();
-  
+
       const initialLeads = [];
       const seenCities = new Set();
-  
-      // Render raw leads immediately one at a time
+
       for (let lead of data) {
         initialLeads.push(lead);
         setLeads([...initialLeads]);
         setFilteredLeads([...initialLeads]);
-  
+
         if (lead.city) seenCities.add(lead.city);
       }
-  
+
       setCities(Array.from(seenCities));
-  
-      // Background enrichment
+
       const enriched = await Promise.all(
         initialLeads.map(async (lead) => {
           if (!lead.latitude || !lead.longitude) {
@@ -105,10 +106,9 @@ export default function LeadListScreen() {
           return lead;
         })
       );
-  
+
       setLeads(enriched);
       setFilteredLeads(enriched);
-      await AsyncStorage.setItem('@cachedLeads', JSON.stringify(enriched));
     } catch (err) {
       console.error("❌ Error fetching leads:", err);
     } finally {
@@ -177,30 +177,39 @@ export default function LeadListScreen() {
 
   const handleExportPress = async () => {
     const token = await SecureStore.getItemAsync("accessToken");
+    console.log('token HERE:', token);
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + token);
+    if (!res.ok) {
+      Alert.alert("Session Expired", "Please sign in again.");
+      return;
+    }
   
     if (!token) {
       Alert.alert("Login Required", "Please sign in with Google first.");
       return;
     }
   
-    Alert.prompt(
-      "Name Your Sheet",
-      "Enter a title for the Google Sheet to export leads:",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Create",
-          onPress: async (sheetName) => {
-            if (!sheetName) return Alert.alert("Invalid name", "Sheet name cannot be empty.");
-            await exportLeads(token, sheetName);
-          },
-        },
-      ],
-      "plain-text"
-    );
+    // Alert.prompt(
+    //   "Name Your Sheet",
+    //   "Enter a title for the Google Sheet to export leads:",
+    //   [
+    //     {
+    //       text: "Cancel",
+    //       style: "cancel",
+    //     },
+    //     {
+    //       text: "Create",
+    //       onPress: async (sheetName) => {
+    //         if (!sheetName) return Alert.alert("Invalid name", "Sheet name cannot be empty.");
+    //         await exportLeads(token, sheetName);
+    //       },
+    //     },
+    //   ],
+    //   "plain-text"
+    // );
+
+    setSheetModalVisible(true);
+
   };
   
 
@@ -393,7 +402,6 @@ export default function LeadListScreen() {
             ref={mapRef}
             style={{ flex: 1 }}
             initialRegion={region}
-            provider="google"
             showsUserLocation={true}
             >
             {filteredLeads.map((lead) =>
@@ -459,6 +467,35 @@ export default function LeadListScreen() {
     )}
 
       </View>
+
+      <Modal visible={sheetModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 12, width: '80%' }}>
+            <Text style={{ marginBottom: 10, fontWeight: 'bold' }}>Name Your Sheet</Text>
+            <TextInput
+              value={sheetTitle}
+              onChangeText={setSheetTitle}
+              placeholder="Sheet name"
+              style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 8, marginBottom: 16 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity onPress={() => setSheetModalVisible(false)} style={{ marginRight: 16 }}>
+                <Text style={{ color: 'gray' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!sheetTitle) return Alert.alert("Invalid name", "Sheet name cannot be empty.");
+                  setSheetModalVisible(false);
+                  const token = await SecureStore.getItemAsync("accessToken");
+                  if (token) exportLeads(token, sheetTitle);
+                }}
+              >
+                <Text style={{ color: '#7C3AED', fontWeight: 'bold' }}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
   

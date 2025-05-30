@@ -13,6 +13,8 @@ import * as SecureStore from "expo-secure-store";
 import { auth } from '../firebase';
 import { useFocusEffect, useTheme } from '@react-navigation/native';
 import { SERVER_URL } from '@env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 
 const StatCard = ({ label, value, iconName, bgColor, iconColor, textColor }) => (
@@ -66,6 +68,13 @@ export default function HomeScreen({ navigation }) {
       loadUserAndStats();
     }, [])
   );
+
+  useEffect(() => {
+    // ⚠️ TEMPORARY: Clear storage on mount to prevent SQLITE_FULL crash
+    AsyncStorage.clear()
+      .then(() => console.log("✅ AsyncStorage cleared on HomeScreen"))
+      .catch((err) => console.error("❌ Failed to clear AsyncStorage:", err));
+  }, []);
   
 
   // useFocusEffect(

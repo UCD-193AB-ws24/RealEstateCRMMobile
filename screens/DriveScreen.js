@@ -59,7 +59,6 @@ export default function DriveScreen() {
     <View style={styles.container}>
       {location && (
         <MapView
-        provider="google"
           ref={mapRef}
           style={styles.map}
           initialRegion={{
