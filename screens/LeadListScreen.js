@@ -24,6 +24,9 @@ import * as Location from 'expo-location';
 import { Dimensions } from 'react-native';
 import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
+import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 
 export default function LeadListScreen() {
@@ -50,7 +53,6 @@ export default function LeadListScreen() {
   const route = useRoute();
   const mapRef = useRef(null);
 
-  const { accessToken, promptAsync, isRequestReady } = useGoogleAuth();
 
   useEffect(() => {
     (async () => {
@@ -79,34 +81,41 @@ export default function LeadListScreen() {
       const response = await fetch(url);
       const data = await response.json();
   
-      setLeads(data); // Show raw data immediately
-      setFilteredLeads(data);
-      setCities([...new Set(data.map((l) => l.city).filter(Boolean))]);
+      const initialLeads = [];
+      const seenCities = new Set();
   
-      // Start enriching in background
+      // Render raw leads immediately one at a time
+      for (let lead of data) {
+        initialLeads.push(lead);
+        setLeads([...initialLeads]);
+        setFilteredLeads([...initialLeads]);
+  
+        if (lead.city) seenCities.add(lead.city);
+      }
+  
+      setCities(Array.from(seenCities));
+  
+      // Background enrichment
       const enriched = await Promise.all(
-        data.map(async (lead) => {
+        initialLeads.map(async (lead) => {
           if (!lead.latitude || !lead.longitude) {
-            const fullAddress = `${lead.address}, ${lead.city}, ${lead.state} ${lead.zip}`;
-            const coords = await getCoordsFromAddress(fullAddress);
+            const coords = await getCoordsFromAddress(`${lead.address}, ${lead.city}, ${lead.state} ${lead.zip}`);
             return coords ? { ...lead, latitude: coords.latitude, longitude: coords.longitude } : lead;
           }
           return lead;
         })
       );
   
-      // Replace once enriched
       setLeads(enriched);
       setFilteredLeads(enriched);
-
       await AsyncStorage.setItem('@cachedLeads', JSON.stringify(enriched));
-
     } catch (err) {
       console.error("❌ Error fetching leads:", err);
     } finally {
       setLoading(false);
     }
   };
+  
   
   
 
@@ -167,41 +176,60 @@ export default function LeadListScreen() {
   }, [searchQuery, selectedCity, selectedStatus, leads]);
 
   const handleExportPress = async () => {
-    let token = accessToken;
-
-    if (!token && isRequestReady) {
-      const result = await promptAsync(); // launches Google login
-      return; // wait for useEffect to get the token, then retry
-    }
-
+    const token = await SecureStore.getItemAsync("accessToken");
+  
     if (!token) {
       Alert.alert("Login Required", "Please sign in with Google first.");
       return;
     }
-
-    exportLeads(token);
-  };
-
-  const exportLeads = async () => {
-    const token = await SecureStore.getItemAsync("accessToken");
-    if (!token) return Alert.alert("No token", "Please login again.");
-
-    try {
-      const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+  
+    Alert.prompt(
+      "Name Your Sheet",
+      "Enter a title for the Google Sheet to export leads:",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
         },
-        body: JSON.stringify({ properties: { title: "Leads Export" } })
-      });
-      const sheet = await response.json();
+        {
+          text: "Create",
+          onPress: async (sheetName) => {
+            if (!sheetName) return Alert.alert("Invalid name", "Sheet name cannot be empty.");
+            await exportLeads(token, sheetName);
+          },
+        },
+      ],
+      "plain-text"
+    );
+  };
+  
 
-      const res = fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheet.spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
+  
+  const exportLeads = async (token, sheetTitle) => {
+    try {
+      // 1. Create sheet
+      const sheetRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          properties: { title: sheetTitle },
+        }),
+      });
+  
+      const sheet = await sheetRes.json();
+      if (!sheet.spreadsheetId) throw new Error("Failed to create spreadsheet");
+  
+      const sheetId = sheet.spreadsheetId;
+  
+      // 2. Populate data
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           values: [
@@ -214,19 +242,28 @@ export default function LeadListScreen() {
               l.zip,
               l.owner || '',
               l.status,
-            ])
-          ]
-        })
-
+            ]),
+          ],
+        }),
       });
-      console.log(res);
-
-      Alert.alert("Exported", "Leads exported to Google Sheets.");
+  
+      // 3. Prompt to open
+      Alert.alert("Exported", "Leads exported to Google Sheets.", [
+        {
+          text: "Open Sheet",
+          onPress: () => {
+            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}`;
+            Linking.openURL(sheetUrl);
+          },
+        },
+        { text: "OK" },
+      ]);
     } catch (e) {
       console.error("Export failed", e);
-      Alert.alert("Export failed", "Something went wrong.");
+      Alert.alert("Export failed", e.message);
     }
   };
+  
 
   const getCoordsFromAddress = async (address) => {
     try {

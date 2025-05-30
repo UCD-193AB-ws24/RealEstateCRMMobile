@@ -1,37 +1,40 @@
-import React, { useState } from 'react';
-import { View, TextInput, Button, Text, Alert, StyleSheet, TouchableOpacity } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import React from 'react';
+import { View, Button, Text, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { useGoogleAuth } from '../googleAuth';
 import * as SecureStore from "expo-secure-store";
-import { auth } from '../firebase';
 import { SERVER_URL } from '@env';
 
 const API_URL = `${SERVER_URL}/api/users`;
-console.log(API_URL);
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { accessToken, promptAsync, isRequestReady } = useGoogleAuth();
 
-  const handleLogin = async () => {
+  
+  const handleGoogleLogin = async () => {
+    const result = await promptAsync();
+  
+    if (result.type !== "success") {
+      return Alert.alert("Login canceled");
+    }
+  
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = result.user;
-      console.log('firebase user', firebaseUser);
-      // await SecureStore.setItemAsync("user", JSON.stringify({
-      //   email: firebaseUser.email,
-      //   id: firebaseUser.uid, // or user.id, depending on your structure
-      // }));
+      // Get user info from SecureStore
+      const userJson = await SecureStore.getItemAsync("user");
+  
+      if (!userJson) {
+        return Alert.alert("Missing user info", "User data was not stored.");
+      }
+  
+      const user = JSON.parse(userJson);
+      console.log("✅ Loaded user from storage", user);
   
       const payload = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: firebaseUser.email.split("@")[0], // Fallback if no name
-        picture: null,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
       };
-
-      console.log("here");
   
-      // ✅ Sync with your backend
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,47 +42,25 @@ export default function LoginScreen({ navigation }) {
       });
   
       const savedUser = await res.json();
-      console.log('result', res);
   
-      // Save everything including name and picture
-      await SecureStore.setItemAsync("user", JSON.stringify({
-        id: savedUser.id,
-        email: savedUser.email,
-        name: savedUser.name,
-        picture: savedUser.picture,
-      }));
-
-      console.log(savedUser.name);
-      console.log(savedUser.picture);
-      console.log(savedUser.email);
-      console.log(savedUser.id);
+      await SecureStore.setItemAsync("user", JSON.stringify(savedUser));
   
       navigation.replace("AppTabs");
-    } catch (error) {
-      Alert.alert("Login Failed", error.message);
+  
+    } catch (err) {
+      console.error("❌ Failed to load user info or save to backend", err);
+      Alert.alert("Login Failed", err.message);
     }
   };
+  
+  
+  
   
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
-      <TextInput
-        placeholder="Email"
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <TextInput
-        placeholder="Password"
-        style={styles.input}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <Button title="Login" onPress={handleLogin} />
+      <Text style={styles.title}>Login with Google</Text>
+      <Button title="Sign in with Google" onPress={handleGoogleLogin} disabled={!isRequestReady} />
       <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
         <Text style={styles.link}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
@@ -87,19 +68,12 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
-  },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 12,
   },
   title: {
     fontSize: 28,

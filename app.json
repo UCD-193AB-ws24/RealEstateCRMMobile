@@ -3,8 +3,12 @@
     "name": "AuthApp",
     "slug": "AuthApp",
     "owner": "lenaray",
+    "scheme": "com.googleusercontent.apps.633200936973-jb6u8rpfchv0qee43isokonncon5ckjp",
     "sdkVersion": "53.0.0",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,8 +22,22 @@
     },
     "ios": {
       "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyDNfQXHXoIeFVA0eSTtFJcsz1oRNc6Pe_Y"
+      },
       "bundleIdentifier": "com.lenaray.AuthApp",
       "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app requires access to your location when open.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app requires access to your location even when closed.",
+        "NSLocationAlwaysUsageDescription": "This app requires access to your location when open.",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "34.31.159.135": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        },
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -37,7 +55,8 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser",
-      ["@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.633200936973-jb6u8rpfchv0qee43isokonncon5ckjp"
         }
@@ -48,9 +67,7 @@
         "projectId": "5131d354-00e8-4b41-aa7a-b848b0c7694b"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/5131d354-00e8-4b41-aa7a-b848b0c7694b"
     }

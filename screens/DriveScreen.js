@@ -14,6 +14,7 @@ export default function DriveScreen() {
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Location permission status:', status);
       if (status !== 'granted') {
         console.log('Permission to access location was denied');
         return;
