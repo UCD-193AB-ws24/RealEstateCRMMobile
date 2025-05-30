@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRoute } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, Dimensions, Modal
+  Image, Alert, Dimensions, Modal, ActivityIndicator
 } from 'react-native';
 import { useNavigation, useTheme } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -9,11 +9,17 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SERVER_URL } from '@env';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useDataContext } from '../DataContext';
+
+
 
 const API_URL = `${SERVER_URL}/api/leads`;
 
 export default function LeadDetailScreen({ route }) {
-  const { lead: initialLead } = route.params;
+  const { lead: initialLead, onUpdate } = route.params || {};
+
+
+
   const [lead, setLead] = useState(initialLead);
   const [updatedLead, setUpdatedLead] = useState(initialLead);
   const [modalVisible, setModalVisible] = useState(false);
@@ -27,6 +33,8 @@ export default function LeadDetailScreen({ route }) {
     { label: 'Offer', value: 'Offer' },
     { label: 'Sale', value: 'Sale' },
   ]);
+  const [isSaving, setIsSaving] = useState(false);
+
 
   const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -62,27 +70,36 @@ export default function LeadDetailScreen({ route }) {
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/${updatedLead.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedLead),
       });
-
   
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+      }
   
-      const result = await response.json(); // ✅ use updated response
-      console.log(result);
+      const result = await response.json();
       setLead(result);
       setUpdatedLead(result);
-      setModalVisible(false); // ✅ close modal
+      setModalVisible(false);
+  
+      // ✅ Pass updated lead back to parent
+      if (onUpdate) onUpdate(result);
+  
       navigation.goBack();
     } catch (err) {
-      Alert.alert('Error', 'Failed to update lead.');
       console.error("Save error:", err);
+      Alert.alert('Error', 'Failed to update lead.');
+    } finally {
+      setIsSaving(false);
     }
   };
+  
   
 
   const confirmDelete = () => {
@@ -174,8 +191,16 @@ export default function LeadDetailScreen({ route }) {
           placeholderTextColor={colors.text + "99"}
         />
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveText}>Save Lead</Text>
+        <TouchableOpacity
+          style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.saveText}>Save Lead</Text>
+          )}
         </TouchableOpacity>
       </View>
 

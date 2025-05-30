@@ -5,6 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DataProvider } from './DataContext';
+
 
 
 import LoadingScreen from './screens/LoadingScreen';
@@ -87,13 +89,15 @@ function MainApp() {
   );
 }
 
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <MainApp />
-      </ThemeProvider>
+      <DataProvider>
+        <ThemeProvider>
+          <MainApp />
+        </ThemeProvider>
+      </DataProvider>
     </SafeAreaProvider>
   );
 }
-

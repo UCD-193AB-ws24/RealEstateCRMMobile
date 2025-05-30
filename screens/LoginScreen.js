@@ -3,12 +3,13 @@ import { View, Button, Text, Alert, StyleSheet, TouchableOpacity } from 'react-n
 import { useGoogleAuth } from '../googleAuth';
 import * as SecureStore from "expo-secure-store";
 import { SERVER_URL } from '@env';
+import { useTheme } from '@react-navigation/native';
 
 const API_URL = `${SERVER_URL}/api/users`;
 
 export default function LoginScreen({ navigation }) {
   const { accessToken, promptAsync, isRequestReady } = useGoogleAuth();
-
+  const { colors } = useTheme();
   
   const handleGoogleLogin = async () => {
     const result = await promptAsync();
@@ -58,12 +59,12 @@ export default function LoginScreen({ navigation }) {
   
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Login with Google</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.text }]}>Login with Google</Text>
       <Button title="Sign in with Google" onPress={handleGoogleLogin} disabled={!isRequestReady} />
-      <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-        <Text style={styles.link}>Don't have an account? Sign up</Text>
-      </TouchableOpacity>
+      {/* <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+        <Text style={[styles.link, { color: colors.primary }]}>Don't have an account? Sign up</Text>
+      </TouchableOpacity> */}
     </View>
   );
 }
@@ -83,7 +84,6 @@ const styles = StyleSheet.create({
   },
   link: {
     marginTop: 16,
-    color: 'blue',
     textAlign: 'center',
   },
 });

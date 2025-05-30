@@ -21,11 +21,14 @@ import { useTheme } from '@react-navigation/native';
 import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useDataContext } from '../DataContext';
 
 
 const API_URL = `${SERVER_URL}/api/leads`;
 
 const AddPropertyScreen = () => {
+  const { markStatsChanged } = useDataContext();
+
     const { colors } = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
@@ -217,7 +220,12 @@ const extractDecimalCoords = (exif) => {
       console.log(response);
       if (!response.ok) throw new Error(data.error || "Add failed");
       Alert.alert("Success", "Property added successfully!");
-      navigation.navigate("Leads", { refresh: true });
+      markStatsChanged();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "AppTabs", params: { screen: "Leads" } }],
+      });
+
     } catch (err) {
       console.error("Error adding property:", err);
       Alert.alert("Error", "Failed to add property.");

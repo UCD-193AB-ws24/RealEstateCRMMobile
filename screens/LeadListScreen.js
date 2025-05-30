@@ -27,10 +27,13 @@ import { SERVER_URL } from '@env';
 import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useDataContext } from '../DataContext';
 
 
 
 export default function LeadListScreen() {
+  const { updatedLeadId, clearFlags } = useDataContext();
+
   const { colors } = useTheme();
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
@@ -55,6 +58,7 @@ export default function LeadListScreen() {
   const mapRef = useRef(null);
   const [sheetModalVisible, setSheetModalVisible] = useState(false);
   const [sheetTitle, setSheetTitle] = useState('');
+  const [lastSheetTitle, setLastSheetTitle] = useState('');
 
 
 
@@ -75,6 +79,20 @@ export default function LeadListScreen() {
       });
     })();
   }, []);
+
+  useEffect(() => {
+    if (!updatedLeadId) return;
+  
+    const updateSingleLead = async () => {
+      const res = await fetch(`${SERVER_URL}/api/lead/${updatedLeadId}`);
+      const updated = await res.json();
+      setLeads((prev) => prev.map(l => l.id === updated.id ? updated : l));
+      setFilteredLeads((prev) => prev.map(l => l.id === updated.id ? updated : l));
+      clearFlags();
+    };
+  
+    updateSingleLead();
+  }, [updatedLeadId]);
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -185,10 +203,14 @@ export default function LeadListScreen() {
       return;
     }
   
-    if (!token) {
-      Alert.alert("Login Required", "Please sign in with Google first.");
-      return;
-    }
+    // if (!token) {
+    //   Alert.alert("Login Required", "Please sign in with Google first.");
+    //   return;
+    // }
+
+    const storedTitle = await SecureStore.getItemAsync("lastSheetTitle");
+  setLastSheetTitle(storedTitle || '');
+  setSheetTitle(storedTitle || 'My Leads');
   
     // Alert.prompt(
     //   "Name Your Sheet",
@@ -215,26 +237,48 @@ export default function LeadListScreen() {
   
 
   
-  const exportLeads = async (token, sheetTitle) => {
+  const exportLeads = async (token, newTitle) => {
     try {
-      // 1. Create sheet
-      const sheetRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          properties: { title: sheetTitle },
-        }),
-      });
+      const lastTitle = await SecureStore.getItemAsync("lastSheetTitle");
+      const lastSheetId = await SecureStore.getItemAsync("lastSheetId");
   
-      const sheet = await sheetRes.json();
-      if (!sheet.spreadsheetId) throw new Error("Failed to create spreadsheet");
+      let sheetId;
   
-      const sheetId = sheet.spreadsheetId;
+      if (newTitle === lastTitle && lastSheetId) {
+        // 📝 Use existing sheet
+        sheetId = lastSheetId;
   
-      // 2. Populate data
+        // ✅ Clear old data first (overwrite)
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A2:Z1000:clear`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } else {
+        // 🆕 Create new sheet
+        const sheetRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            properties: { title: newTitle },
+          }),
+        });
+  
+        const sheet = await sheetRes.json();
+        if (!sheet.spreadsheetId) throw new Error("Failed to create spreadsheet");
+  
+        sheetId = sheet.spreadsheetId;
+  
+        // ✅ Store for reuse
+        await SecureStore.setItemAsync("lastSheetTitle", newTitle);
+        await SecureStore.setItemAsync("lastSheetId", sheetId);
+      }
+  
+      // 📤 Push data
       await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
         method: 'POST',
         headers: {
@@ -257,14 +301,10 @@ export default function LeadListScreen() {
         }),
       });
   
-      // 3. Prompt to open
       Alert.alert("Exported", "Leads exported to Google Sheets.", [
         {
           text: "Open Sheet",
-          onPress: () => {
-            const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}`;
-            Linking.openURL(sheetUrl);
-          },
+          onPress: () => Linking.openURL(`https://docs.google.com/spreadsheets/d/${sheetId}`),
         },
         { text: "OK" },
       ]);
@@ -273,6 +313,7 @@ export default function LeadListScreen() {
       Alert.alert("Export failed", e.message);
     }
   };
+  
   
 
   const getCoordsFromAddress = async (address) => {
@@ -298,8 +339,20 @@ export default function LeadListScreen() {
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
-    style={[styles.card, { backgroundColor: colors.card }]}
-    onPress={() => navigation.navigate("LeadDetails", { lead: item })}
+      style={[styles.card, { backgroundColor: colors.card }]}
+      onPress={() =>
+        navigation.navigate("LeadDetails", {
+          lead: item,
+          onUpdate: (updatedLead) => {
+            setLeads((prev) =>
+              prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
+            );
+            setFilteredLeads((prev) =>
+              prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
+            );
+          },
+        })
+      }
     >
       {item.images?.[0] && (
         <Image source={{ uri: item.images[0] }} style={styles.image} resizeMode="cover" />
@@ -314,7 +367,6 @@ export default function LeadListScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={{ flex: 1 }}>
         {/* Filters Section */}
         <View style={[styles.headerWrapper, { backgroundColor: colors.background }, { zIndex: cityOpen || statusOpen ? 9999 : 1 }]}>
           <View style={styles.searchContainer}>
@@ -380,6 +432,7 @@ export default function LeadListScreen() {
             </View>
 
         </View>
+  
   
         {!isMapView ? (
     <FlatList
@@ -467,18 +520,25 @@ export default function LeadListScreen() {
     </>
     )}
 
-      </View>
-
       <Modal visible={sheetModalVisible} transparent animationType="fade">
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <View style={{ backgroundColor: 'white', padding: 20, borderRadius: 12, width: '80%' }}>
             <Text style={{ marginBottom: 10, fontWeight: 'bold' }}>Name Your Sheet</Text>
+
+            {/* ✨ Conditional overwrite note */}
+            {lastSheetTitle && sheetTitle === lastSheetTitle && (
+              <Text style={{ marginBottom: 8, fontStyle: 'italic', color: 'gray' }}>
+                Will overwrite: <Text style={{ fontWeight: 'bold' }}>{lastSheetTitle}</Text>
+              </Text>
+            )}
+
             <TextInput
               value={sheetTitle}
               onChangeText={setSheetTitle}
               placeholder="Sheet name"
               style={{ borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 8, marginBottom: 16 }}
             />
+
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <TouchableOpacity onPress={() => setSheetModalVisible(false)} style={{ marginRight: 16 }}>
                 <Text style={{ color: 'gray' }}>Cancel</Text>
@@ -497,6 +557,7 @@ export default function LeadListScreen() {
           </View>
         </View>
       </Modal>
+
     </SafeAreaView>
   );
   
@@ -506,7 +567,7 @@ export default function LeadListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { padding: 16 },
+  list: { padding: 6 },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -519,7 +580,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#F9FAFB',
     zIndex: 9999,
-    height: 120,
+    height: 130,
   },
   dropdownContainer: {
     borderColor: '#ccc',

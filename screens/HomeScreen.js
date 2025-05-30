@@ -14,8 +14,7 @@ import { useFocusEffect, useTheme } from '@react-navigation/native';
 import { SERVER_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-
+import { useDataContext } from '../DataContext';
 
 
 const StatCard = ({ label, value, iconName, bgColor, iconColor, textColor }) => (
@@ -32,6 +31,8 @@ const StatCard = ({ label, value, iconName, bgColor, iconColor, textColor }) => 
 );
 
 export default function HomeScreen({ navigation }) {
+  const { statsChanged, clearFlags } = useDataContext();
+
   const { colors } = useTheme();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,11 @@ export default function HomeScreen({ navigation }) {
       const parsedUser = JSON.parse(storedUser);
       const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
       const res = await fetch(statsUrl);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`❌ Fetch failed: ${res.status}\n${text}`);
+      }
+
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -54,21 +60,45 @@ export default function HomeScreen({ navigation }) {
   };
   
 
-  useFocusEffect(
-    useCallback(() => {
-      const loadUserAndStats = async () => {
-        const storedUser = await SecureStore.getItemAsync("user");
-        console.log(storedUser);
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser); // This will include the Google display name
-          await fetchStats();
-        }
-      };
-  
-      loadUserAndStats();
-    }, [])
-  );
+  useEffect(() => {
+  const loadStats = async () => {
+    const storedUser = await SecureStore.getItemAsync("user");
+    console.log("🔒 Stored user:", storedUser);
+
+    if (!storedUser) {
+      console.warn("⚠️ No user in SecureStore.");
+      return;
+    }
+
+    const parsedUser = JSON.parse(storedUser);
+    setUser(parsedUser);
+
+    const statsUrl = `${SERVER_URL}/api/stats/${parsedUser.id}`;
+    console.log("🌐 Fetching stats from", statsUrl);
+
+    try {
+      const res = await fetch(statsUrl);
+      console.log("📥 Response status:", res.status);
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`❌ Failed: ${res.status}\n${text}`);
+      }
+
+      const data = await res.json();
+      console.log("📊 Stats fetched:", data);
+      setStats(data);
+    } catch (err) {
+      console.error("❌ Fetch error:", err);
+    } finally {
+      setLoading(false);
+      clearFlags();
+    }
+  };
+
+  loadStats();
+}, []);
+
 
   useEffect(() => {
     // ⚠️ TEMPORARY: Clear storage on mount to prevent SQLITE_FULL crash
@@ -76,6 +106,15 @@ export default function HomeScreen({ navigation }) {
       .then(() => console.log("✅ AsyncStorage cleared on HomeScreen"))
       .catch((err) => console.error("❌ Failed to clear AsyncStorage:", err));
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (statsChanged) {
+        fetchStats();
+        clearFlags(); // don't forget to reset the flag!
+      }
+    }, [statsChanged])
+  );
   
 
   // useFocusEffect(
