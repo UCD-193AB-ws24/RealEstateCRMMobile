@@ -91,42 +91,58 @@ const extractDecimalCoords = (exif) => {
       allowsMultipleSelection: true,
       quality: 1,
       base64: false,
-      exif: true,
+      exif: true, // to try and extract GPS from metadata
     });
   
     if (!result.canceled && result.assets.length > 0) {
-      const resizedBase64Images = await Promise.all(
-        result.assets.map(async (asset) => {
-          try {
-            const resized = await ImageManipulator.manipulateAsync(
-              asset.uri,
-              [{ resize: { width: 800 } }],
-              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-            );
-            return `data:image/jpeg;base64,${resized.base64}`;
-          } catch (e) {
-            console.error('❌ Image resize failed:', e);
-            return null;
+      const validImages = [];
+  
+      for (const asset of result.assets) {
+        let usedCoords = false;
+  
+        // 1️⃣ Try EXIF GPS metadata
+        if (
+          asset.exif?.GPSLatitude &&
+          asset.exif?.GPSLongitude &&
+          !address // only autofill if address isn't already set
+        ) {
+          const coords = extractDecimalCoords(asset.exif);
+          if (coords) {
+            console.log("📍 Extracted EXIF coords:", coords);
+            await getAddressFromCoords(coords.lat, coords.lng);
+            usedCoords = true;
           }
-        })
-      );
-  
-      const validImages = resizedBase64Images.filter(Boolean);
-      setImages((prev) => [...prev, ...validImages]);
-  
-      if (
-        route.params?.from === "home" &&
-        result.assets[0]?.exif?.GPSLatitude &&
-        result.assets[0]?.exif?.GPSLongitude
-      ) {
-        const coords = extractDecimalCoords(result.assets[0].exif);
-        if (coords) {
-          console.log("📍 EXIF-based location:", coords);
-          getAddressFromCoords(coords.lat, coords.lng);
         }
+  
+        // 2️⃣ Fallback to current location if EXIF missing
+        if (!usedCoords && !address) {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({});
+            console.log("📍 Fallback current location:", loc.coords);
+            await getAddressFromCoords(loc.coords.latitude, loc.coords.longitude);
+          }
+        }
+  
+        // 3️⃣ Resize and convert image
+        try {
+          const resized = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 800 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          );
+          validImages.push(`data:image/jpeg;base64,${resized.base64}`);
+        } catch (e) {
+          console.error("❌ Image resize failed:", e);
+        }
+      }
+  
+      if (validImages.length > 0) {
+        setImages((prev) => [...prev, ...validImages]);
       }
     }
   };
+  
   
 
   const takePicture = async () => {
@@ -144,6 +160,16 @@ const extractDecimalCoords = (exif) => {
   
     if (!result.canceled && result.assets[0]?.uri) {
       try {
+        // 💡 Fetch current GPS location immediately
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const location = await Location.getCurrentPositionAsync({});
+          if (location && location.coords && !address) {
+            console.log("📍 Current location used:", location.coords);
+            getAddressFromCoords(location.coords.latitude, location.coords.longitude);
+          }
+        }
+  
         const resized = await ImageManipulator.manipulateAsync(
           result.assets[0].uri,
           [{ resize: { width: 800 } }],
@@ -153,7 +179,7 @@ const extractDecimalCoords = (exif) => {
         const base64Image = `data:image/jpeg;base64,${resized.base64}`;
         setImages((prev) => [...prev, base64Image]);
       } catch (e) {
-        console.error('❌ Failed to resize captured image:', e);
+        console.error("❌ Failed to process photo:", e);
         Alert.alert("Error", "Failed to process photo.");
       }
     }
@@ -223,7 +249,23 @@ const extractDecimalCoords = (exif) => {
       markStatsChanged();
       navigation.reset({
         index: 0,
-        routes: [{ name: "AppTabs", params: { screen: "Leads" } }],
+        routes: [
+          {
+            name: "AppTabs",
+            state: {
+              index: 2, // "Leads" tab
+              routes: [
+                { name: "Drive" },
+                { name: "Home" },
+                {
+                  name: "Leads",
+                  params: { newLead: data },
+                },
+                { name: "Profile" }
+              ]
+            }
+          }
+        ]
       });
 
     } catch (err) {

@@ -136,6 +136,16 @@ export default function LeadListScreen() {
   };
   
   
+  useFocusEffect(
+    useCallback(() => {
+      if (route.params?.newLead) {
+        const newLead = route.params.newLead;
+        setLeads(prev => [newLead, ...prev]);
+        setFilteredLeads(prev => [newLead, ...prev]);
+        navigation.setParams({ newLead: null });
+      }
+    }, [route.params?.newLead])
+  );
   
 
   useFocusEffect(
@@ -147,12 +157,17 @@ export default function LeadListScreen() {
           setLeads(cachedLeads);
           setFilteredLeads(cachedLeads);
           setCities([...new Set(cachedLeads.map((l) => l.city).filter(Boolean))]);
-          setLoading(false); // so UI renders right away
+          setLoading(false);
         }
       };
+  
       loadCachedLeads();
-      fetchLeads(); // Fetch fresh data in background
-    }, [])
+  
+      // ✅ Only refetch if no new lead is being passed
+      if (!route.params?.newLead) {
+        fetchLeads();
+      }
+    }, [route.params?.newLead])
   );
   
 
@@ -339,21 +354,25 @@ export default function LeadListScreen() {
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
-      onPress={() =>
-        navigation.navigate("LeadDetails", {
-          lead: item,
-          onUpdate: (updatedLead) => {
-            setLeads((prev) =>
-              prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
-            );
-            setFilteredLeads((prev) =>
-              prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
-            );
-          },
-        })
-      }
-    >
+    style={[styles.card, { backgroundColor: colors.card }]}
+    onPress={() =>
+      navigation.navigate("LeadDetails", {
+        lead: item,
+        onUpdate: (updatedLead) => {
+          setLeads((prev) =>
+            prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
+          );
+          setFilteredLeads((prev) =>
+            prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
+          );
+        },
+        onDelete: (deletedId) => {
+          setLeads((prev) => prev.filter((l) => l.id !== deletedId));
+          setFilteredLeads((prev) => prev.filter((l) => l.id !== deletedId));
+        },
+      })
+    }
+  >
       {item.images?.[0] && (
         <Image source={{ uri: item.images[0] }} style={styles.image} resizeMode="cover" />
       )}

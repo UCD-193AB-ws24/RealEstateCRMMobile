@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AuthApp",
+    "name": "est8",
     "slug": "AuthApp",
     "owner": "lenaray",
     "scheme": "com.googleusercontent.apps.633200936973-8g5lubtv2dnsh4budd1nojmr0bt809p0",
@@ -11,7 +11,7 @@
     ],
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/est8.png",
     "userInterfaceStyle": "light",
     "entryPoint": "./App.js",
     "newArchEnabled": true,
@@ -43,7 +43,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/est8.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.lenaray.AuthApp",

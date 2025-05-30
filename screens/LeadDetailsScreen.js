@@ -18,6 +18,7 @@ const API_URL = `${SERVER_URL}/api/leads`;
 export default function LeadDetailScreen({ route }) {
   const { lead: initialLead, onUpdate } = route.params || {};
 
+  const { updateStats } = useDataContext();
 
 
   const [lead, setLead] = useState(initialLead);
@@ -116,12 +117,23 @@ export default function LeadDetailScreen({ route }) {
   const handleDelete = async () => {
     try {
       const response = await fetch(`${API_URL}/${lead.id}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
-
+  
       if (!response.ok) throw new Error("Failed to delete");
+  
       Alert.alert("Deleted", "Lead deleted successfully");
-      navigation.navigate("Leads", { refresh: true });
+  
+      // 🔁 Inform parent screen of deletion
+      if (route.params?.onDelete) {
+        route.params.onDelete(lead.id);
+      }
+  
+      // 🔁 Trigger stat refresh
+      updateStats();  // this will cause HomeScreen to fetch updated stats
+  
+      navigation.goBack();
+  
     } catch (err) {
       Alert.alert("Error", "Failed to delete lead.");
     }
