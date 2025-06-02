@@ -27,7 +27,7 @@ import { useDataContext } from '../DataContext';
 const API_URL = `${SERVER_URL}/api/leads`;
 
 const AddPropertyScreen = () => {
-  const { markStatsChanged } = useDataContext();
+  const { updateStats } = useDataContext();
 
     const { colors } = useTheme();
   const navigation = useNavigation();
@@ -246,7 +246,7 @@ const extractDecimalCoords = (exif) => {
       console.log(response);
       if (!response.ok) throw new Error(data.error || "Add failed");
       Alert.alert("Success", "Property added successfully!");
-      markStatsChanged();
+      updateStats();
       navigation.reset({
         index: 0,
         routes: [

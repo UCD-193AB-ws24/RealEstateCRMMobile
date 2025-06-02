@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as SecureStore from "expo-secure-store";
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback } from 'react';
 import { auth } from '../firebase';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -59,7 +60,7 @@ export default function LeadListScreen() {
   const [sheetModalVisible, setSheetModalVisible] = useState(false);
   const [sheetTitle, setSheetTitle] = useState('');
   const [lastSheetTitle, setLastSheetTitle] = useState('');
-
+  const [mapInitialized, setMapInitialized] = useState(false);
 
 
   useEffect(() => {
@@ -93,6 +94,29 @@ export default function LeadListScreen() {
   
     updateSingleLead();
   }, [updatedLeadId]);
+
+  useEffect(() => {
+    if (isMapView && mapRef.current && !mapInitialized) {
+      if (filteredLeads.length > 0 && filteredLeads[0].latitude && filteredLeads[0].longitude) {
+        mapRef.current.animateToRegion({
+          latitude: filteredLeads[0].latitude,
+          longitude: filteredLeads[0].longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }, 1000);
+      } else {
+        Location.getCurrentPositionAsync({}).then(location => {
+          mapRef.current.animateToRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 1000);
+        });
+      }
+      setMapInitialized(true);
+    }
+  }, [isMapView, filteredLeads]);
 
   const fetchLeads = async () => {
     setLoading(true);
@@ -384,8 +408,10 @@ export default function LeadListScreen() {
     </TouchableOpacity>
   );
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={{ flex: 1, paddingTop: insets.top, backgroundColor: colors.background }}>
         {/* Filters Section */}
         <View style={[styles.headerWrapper, { backgroundColor: colors.background }, { zIndex: cityOpen || statusOpen ? 9999 : 1 }]}>
           <View style={styles.searchContainer}>
@@ -458,7 +484,7 @@ export default function LeadListScreen() {
         data={filteredLeads}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom }]}
         ListFooterComponent={
           loading ? (
             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
@@ -472,6 +498,7 @@ export default function LeadListScreen() {
     <>
     {console.log("Markers:", filteredLeads.map(l => ({ lat: l.latitude, lon: l.longitude })))}
         <MapView
+            provider="google"
             ref={mapRef}
             style={{ flex: 1 }}
             initialRegion={region}
@@ -490,15 +517,15 @@ export default function LeadListScreen() {
             )}
             </MapView>
 
-            <View style={{ position: "absolute", bottom: 0, paddingBottom: 20 }}>
+            <View style={{ position: "absolute", bottom: insets.bottom - 40 }}>
             <FlatList
                 data={filteredLeads}
                 horizontal
                 keyExtractor={(item) => item.id.toString()}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{
-                paddingHorizontal: 10,
-                paddingBottom: 20,
+                  paddingHorizontal: 10,
+                  paddingBottom: 20,
                 }}
                 renderItem={({ item }) => (
                 <TouchableOpacity
@@ -524,11 +551,41 @@ export default function LeadListScreen() {
                         <Text>No Image</Text>
                         </View>
                     )}
-                    <View style={{ padding: 10 }}>
+                      <View style={{ padding: 10 }}>
                         <Text style={{ fontWeight: 'bold' }}>{item.name || item.address}</Text>
                         <Text>{item.city}</Text>
-                        <Text>Status: {item.status}</Text>
-                    </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                          <Text style={{ lineHeight: 20 }}>Status: {item.status}</Text>
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: '#7C3AED',
+                              paddingHorizontal: 10,
+                              paddingVertical: 4, // reduce vertical padding
+                              borderRadius: 6,
+                              marginLeft: 8,       // gives a little space from status
+                            }}
+                            onPress={() =>
+                              navigation.navigate("LeadDetails", {
+                                lead: item,
+                                onUpdate: (updatedLead) => {
+                                  setLeads((prev) => prev.map((l) => (l.id === updatedLead.id ? updatedLead : l)));
+                                  setFilteredLeads((prev) => prev.map((l) => (l.id === updatedLead.id ? updatedLead : l)));
+                                },
+                                onDelete: (deletedId) => {
+                                  setLeads((prev) => prev.filter((l) => l.id !== deletedId));
+                                  setFilteredLeads((prev) => prev.filter((l) => l.id !== deletedId));
+                                },
+                              })
+                            }
+                          >
+                            <Text style={{ color: '#fff', fontSize: 13 }}>Details</Text>
+                          </TouchableOpacity>
+                        </View>
+
+
+                      </View>
+
+
                     </View>
                 </TouchableOpacity>
                 )}
@@ -577,7 +634,7 @@ export default function LeadListScreen() {
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
   
   

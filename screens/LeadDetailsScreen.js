@@ -159,14 +159,23 @@ export default function LeadDetailScreen({ route }) {
       {/* Carousel */}
       <View style={[styles.carouselContainer, { backgroundColor: colors.background }]}>
         <ScrollView horizontal contentContainerStyle={styles.carousel} showsHorizontalScrollIndicator={false}>
-        {updatedLead.images?.map((img, i) => (
+        {(updatedLead.images?.length > 0 ? updatedLead.images : [null]).map((img, i) => (
           <View key={i} style={styles.imageWrapper}>
-            <Image source={{ uri: img }} style={styles.image} />
-            <TouchableOpacity style={styles.removeBtn} onPress={() => handleImageRemove(i)}>
-              <Text style={{ color: 'white' }}>✕</Text>
-            </TouchableOpacity>
+            {img ? (
+              <>
+                <Image source={{ uri: img }} style={styles.image} />
+                <TouchableOpacity style={styles.removeBtn} onPress={() => handleImageRemove(i)}>
+                  <Text style={{ color: 'white' }}>✕</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={[styles.image, { backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ fontSize: 16, color: '#9CA3AF' }}>No Image</Text>
+              </View>
+            )}
           </View>
         ))}
+
         <TouchableOpacity style={styles.addImage} onPress={handleImagePick}>
           <Text style={styles.addImageText}>＋</Text>
         </TouchableOpacity>

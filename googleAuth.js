@@ -12,15 +12,15 @@ WebBrowser.maybeCompleteAuthSession();
 export function useGoogleAuth() {
   const [accessToken, setAccessToken] = useState(null);
 
-  // const redirectUri = makeRedirectUri({
-  //   scheme: 'com.googleusercontent.apps.633200936973-jb6u8rpfchv0qee43isokonncon5ckjp',
-  //   useProxy: false,
-  // });
-
   const redirectUri = makeRedirectUri({
-    scheme: 'com.googleusercontent.apps.633200936973-8g5lubtv2dnsh4budd1nojmr0bt809p0',
+    scheme: 'com.googleusercontent.apps.633200936973-jb6u8rpfchv0qee43isokonncon5ckjp',
     useProxy: false,
   });
+
+  // const redirectUri = makeRedirectUri({
+  //   scheme: 'com.googleusercontent.apps.633200936973-8g5lubtv2dnsh4budd1nojmr0bt809p0',
+  //   useProxy: false,
+  // });
   
 
   console.log("REDIRECT URI →", redirectUri);

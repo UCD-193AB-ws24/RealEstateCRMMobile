@@ -61,6 +61,7 @@ export default function DriveScreen() {
         <MapView
           ref={mapRef}
           style={styles.map}
+          provider="google"
           initialRegion={{
             latitude: location.latitude,
             longitude: location.longitude,
