@@ -1,7 +1,7 @@
 import React, { useState, useRoute } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
-  Image, Alert, Dimensions, Modal, ActivityIndicator
+  Image, Alert, Dimensions, Modal, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard
 } from 'react-native';
 import { useNavigation, useTheme } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -71,6 +71,12 @@ export default function LeadDetailScreen({ route }) {
   };
 
   const handleSave = async () => {
+    const hasChanges = JSON.stringify(lead) !== JSON.stringify(updatedLead);
+    if (!hasChanges) {
+      navigation.goBack(); // No changes, just go back
+      return;
+    }
+  
     setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/${updatedLead.id}`, {
@@ -89,7 +95,6 @@ export default function LeadDetailScreen({ route }) {
       setUpdatedLead(result);
       setModalVisible(false);
   
-      // ✅ Pass updated lead back to parent
       if (onUpdate) onUpdate(result);
   
       navigation.goBack();
@@ -100,6 +105,7 @@ export default function LeadDetailScreen({ route }) {
       setIsSaving(false);
     }
   };
+  
   
   
 
@@ -140,7 +146,16 @@ export default function LeadDetailScreen({ route }) {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    keyboardVerticalOffset={100} // adjust this based on your header height
+  >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        keyboardShouldPersistTaps="handled"
+      >
       {/* Property Name + Icons */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={confirmDelete}>
@@ -250,6 +265,8 @@ export default function LeadDetailScreen({ route }) {
         </View>
       </Modal>
     </ScrollView>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
   );
 }
 

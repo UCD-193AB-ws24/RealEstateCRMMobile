@@ -29,7 +29,9 @@ import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useDataContext } from '../DataContext';
-
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as Permissions from 'expo-permissions';
 
 
 export default function LeadListScreen() {
@@ -233,123 +235,46 @@ export default function LeadListScreen() {
     setFilteredLeads(filtered);
   }, [searchQuery, selectedCity, selectedStatus, leads]);
 
-  const handleExportPress = async () => {
-    const token = await SecureStore.getItemAsync("accessToken");
-    console.log('token HERE:', token);
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + token);
-    if (!res.ok) {
-      Alert.alert("Session Expired", "Please sign in again.");
-      return;
-    }
   
-    // if (!token) {
-    //   Alert.alert("Login Required", "Please sign in with Google first.");
-    //   return;
-    // }
-
-    const storedTitle = await SecureStore.getItemAsync("lastSheetTitle");
-  setLastSheetTitle(storedTitle || '');
-  setSheetTitle(storedTitle || 'My Leads');
-  
-    // Alert.prompt(
-    //   "Name Your Sheet",
-    //   "Enter a title for the Google Sheet to export leads:",
-    //   [
-    //     {
-    //       text: "Cancel",
-    //       style: "cancel",
-    //     },
-    //     {
-    //       text: "Create",
-    //       onPress: async (sheetName) => {
-    //         if (!sheetName) return Alert.alert("Invalid name", "Sheet name cannot be empty.");
-    //         await exportLeads(token, sheetName);
-    //       },
-    //     },
-    //   ],
-    //   "plain-text"
-    // );
-
-    setSheetModalVisible(true);
-
+  const handleExportPress = () => {
+    exportLeadsToCSV();
   };
   
 
   
-  const exportLeads = async (token, newTitle) => {
+  const exportLeadsToCSV = async () => {
     try {
-      const lastTitle = await SecureStore.getItemAsync("lastSheetTitle");
-      const lastSheetId = await SecureStore.getItemAsync("lastSheetId");
-  
-      let sheetId;
-  
-      if (newTitle === lastTitle && lastSheetId) {
-        // 📝 Use existing sheet
-        sheetId = lastSheetId;
-  
-        // ✅ Clear old data first (overwrite)
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A2:Z1000:clear`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } else {
-        // 🆕 Create new sheet
-        const sheetRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            properties: { title: newTitle },
-          }),
-        });
-  
-        const sheet = await sheetRes.json();
-        if (!sheet.spreadsheetId) throw new Error("Failed to create spreadsheet");
-  
-        sheetId = sheet.spreadsheetId;
-  
-        // ✅ Store for reuse
-        await SecureStore.setItemAsync("lastSheetTitle", newTitle);
-        await SecureStore.setItemAsync("lastSheetId", sheetId);
+      if (!filteredLeads.length) {
+        Alert.alert("No leads", "There are no leads to export.");
+        return;
       }
   
-      // 📤 Push data
-      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          values: [
-            ['Name', 'Address', 'City', 'State', 'Zip', 'Owner', 'Status'],
-            ...filteredLeads.map(l => [
-              l.name || '',
-              l.address,
-              l.city,
-              l.state,
-              l.zip,
-              l.owner || '',
-              l.status,
-            ]),
-          ],
-        }),
-      });
-  
-      Alert.alert("Exported", "Leads exported to Google Sheets.", [
-        {
-          text: "Open Sheet",
-          onPress: () => Linking.openURL(`https://docs.google.com/spreadsheets/d/${sheetId}`),
-        },
-        { text: "OK" },
+      const header = ['Name', 'Address', 'City', 'State', 'Zip', 'Owner', 'Status'];
+      const rows = filteredLeads.map(l => [
+        l.name || '',
+        l.address || '',
+        l.city || '',
+        l.state || '',
+        l.zip || '',
+        l.owner || '',
+        l.status || '',
       ]);
-    } catch (e) {
-      console.error("Export failed", e);
-      Alert.alert("Export failed", e.message);
+  
+      const csvContent = [header, ...rows]
+        .map(row => row.map(field => `"${(field || '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+  
+      const fileUri = `${FileSystem.documentDirectory}leads_export_${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+  
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/csv',
+        dialogTitle: 'Exported Leads',
+        UTI: 'public.comma-separated-values-text',
+      });
+    } catch (error) {
+      console.error("CSV export failed:", error);
+      Alert.alert("Export Failed", "Could not export leads to CSV.");
     }
   };
   
@@ -489,7 +414,7 @@ export default function LeadListScreen() {
           loading ? (
             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#7C3AED" />
-              <Text>Loading leads...</Text>
+              <Text style={{ colors: colors.text }}>Loading leads...</Text>
             </View>
           ) : null
         }

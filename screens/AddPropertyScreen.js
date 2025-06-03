@@ -9,7 +9,9 @@ import {
   Alert,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -22,6 +24,7 @@ import { GEOCODING_API_KEY } from '@env';
 import { SERVER_URL } from '@env';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useDataContext } from '../DataContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 const API_URL = `${SERVER_URL}/api/leads`;
@@ -44,6 +47,8 @@ const longitude = location?.longitude;
   const [zip, setZip] = useState("");
   const [owner, setOwner] = useState("");
   const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     console.log("Route params on load:", route.params);
@@ -218,7 +223,7 @@ const extractDecimalCoords = (exif) => {
 
     const { email, id: userId } = JSON.parse(storedUser);
 
-    if (!name || !address || !city || !state || !zip || !owner) {
+    if (!address || !city || !state || !zip) {
       Alert.alert("Missing fields", "Please fill in all required fields.");
       return;
     }
@@ -237,6 +242,7 @@ const extractDecimalCoords = (exif) => {
     };
 
     try {
+      setLoading(true);
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -245,6 +251,7 @@ const extractDecimalCoords = (exif) => {
       const data = await response.json();
       console.log(response);
       if (!response.ok) throw new Error(data.error || "Add failed");
+
       Alert.alert("Success", "Property added successfully!");
       updateStats();
       navigation.reset({
@@ -271,89 +278,110 @@ const extractDecimalCoords = (exif) => {
     } catch (err) {
       console.error("Error adding property:", err);
       Alert.alert("Error", "Failed to add property.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}>
-    <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    keyboardVerticalOffset={Platform.OS === 'ios' ? 5 : 0} // tweak if header present
-  >
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Add New Property</Text>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-        <TouchableOpacity style={[styles.imageButton, { flex: 1, marginRight: 5 }]} onPress={takePicture}>
-            <Text style={styles.imageButtonText}>Take a Picture</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.imageButton, { flex: 1, marginLeft: 5 }]} onPress={pickImage}>
-            <Text style={styles.imageButtonText}>Select from Gallery</Text>
-        </TouchableOpacity>
-        </View>
-
-        <ScrollView horizontal style={styles.imageScroll}>
-        {images.map((imgUri, idx) => (
-            <View key={idx} style={{ position: "relative", marginRight: 10 }}>
-            <Image source={{ uri: imgUri }} style={styles.image} />
-            <TouchableOpacity
-                onPress={() => {
-                setImages(prev => prev.filter((_, i) => i !== idx));
-                }}
-                style={styles.removeButton}
-            >
-                <Text style={{ color: "white", fontWeight: "bold" }}>✕</Text>
-            </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 5 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.container,
+            {
+              backgroundColor: colors.background,
+              paddingBottom: insets.bottom + 30, // 80 = custom safe spacing above nav bar
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
+            <Text style={[styles.title, { color: colors.text }]}>Add New Property</Text>
+  
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+              <TouchableOpacity style={[styles.imageButton, { flex: 1, marginRight: 5 }]} onPress={takePicture}>
+                <Text style={styles.imageButtonText}>Take a Picture</Text>
+              </TouchableOpacity>
+  
+              <TouchableOpacity style={[styles.imageButton, { flex: 1, marginLeft: 5 }]} onPress={pickImage}>
+                <Text style={styles.imageButtonText}>Select from Gallery</Text>
+              </TouchableOpacity>
             </View>
-        ))}
-        </ScrollView>
+  
+            <ScrollView horizontal style={styles.imageScroll}>
+              {images.map((imgUri, idx) => (
+                <View key={idx} style={{ position: "relative", marginRight: 10 }}>
+                  <Image source={{ uri: imgUri }} style={styles.image} />
+                  <TouchableOpacity
+                    onPress={() => {
+                      setImages(prev => prev.filter((_, i) => i !== idx));
+                    }}
+                    style={styles.removeButton}
+                  >
+                    <Text style={{ color: "white", fontWeight: "bold" }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+  
+            {[{ label: "Name", val: name, set: setName },
+              { label: "Address", val: address, set: setAddress },
+              { label: "City", val: city, set: setCity },
+              { label: "State", val: state, set: setState },
+              { label: "Zip", val: zip, set: setZip },
+              { label: "Owner", val: owner, set: setOwner },
+            ].map(({ label, val, set }, idx) => (
+              <TextInput
+                key={idx}
+                placeholder={label}
+                placeholderTextColor='#9CA3AF'
+                style={[styles.input, {
+                  borderColor: colors.border,
+                  color: colors.text,
+                  backgroundColor: colors.card,
+                }]}
+                value={val}
+                onChangeText={set}
+              />
+            ))}
+  
+            <TextInput
+              placeholder="Notes"
+              placeholderTextColor='#9CA3AF'
+              multiline
+              value={notes}
+              onChangeText={setNotes}
+              style={[styles.input, {
+                height: 80,
+                borderColor: colors.border,
+                color: colors.text,
+                backgroundColor: colors.card,
+              }]}
+            />
+  
+            <TouchableOpacity
+            style={[styles.submitButton, loading && { opacity: 0.6 }]}
+            onPress={handleAddProperty}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitText}>Submit</Text>
+            )}
+          </TouchableOpacity>
 
-        {[
-        { label: "Name", val: name, set: setName },
-        { label: "Address", val: address, set: setAddress },
-        { label: "City", val: city, set: setCity },
-        { label: "State", val: state, set: setState },
-        { label: "Zip", val: zip, set: setZip },
-        { label: "Owner", val: owner, set: setOwner },
-        ].map(({ label, val, set }, idx) => (
-        <TextInput
-            key={idx}
-            placeholder={label}
-            placeholderTextColor='#9CA3AF'
-            style={[styles.input, {
-            borderColor: colors.border,
-            color: colors.text,
-            backgroundColor: colors.card,
-            }]}
-            value={val}
-            onChangeText={set}
-        />
-        ))}
-
-        <TextInput
-        placeholder="Notes"
-        placeholderTextColor='#9CA3AF'
-        multiline
-        value={notes}
-        onChangeText={setNotes}
-        style={[styles.input, {
-            height: 80,
-            borderColor: colors.border,
-            color: colors.text,
-            backgroundColor: colors.card,
-        }]}
-        />
-
-        <TouchableOpacity style={styles.submitButton} onPress={handleAddProperty}>
-        <Text style={styles.submitText}>Submit</Text>
-        </TouchableOpacity>
-    </ScrollView>
-    </KeyboardAvoidingView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
-
   );
+  
 };
 
 const styles = StyleSheet.create({
