@@ -7,9 +7,17 @@ module.exports = function (api) {
         ['module:react-native-dotenv', {
           moduleName: '@env',
           path: '.env',
-          allowUndefined: false
+          blacklist: null,
+          whitelist: null,
+          safe: false,
+          allowUndefined: true
         }]
-      ]
+      ],
+      env: {
+        test: {
+          plugins: ['@babel/plugin-transform-runtime']
+        }
+      }
     };
   };
   
