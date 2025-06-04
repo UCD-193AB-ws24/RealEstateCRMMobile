@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from "expo-secure-store";
@@ -37,6 +38,15 @@ export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
+  };
+  
+
 
   const fetchStats = async () => {
     try {
@@ -146,7 +156,17 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}> 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#7C3AED"]} // Android spinner color
+            tintColor="#7C3AED"  // iOS spinner color
+          />
+        }
+      >
       {user && <Text style={[styles.welcomeText, { color: colors.text }]}>Hello, {user.name || 'User'}</Text>}
 
 

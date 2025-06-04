@@ -35,6 +35,62 @@ export default function LeadDetailScreen({ route }) {
     { label: 'Sale', value: 'Sale' },
   ]);
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const [stateOpen, setStateOpen] = useState(false);
+const [stateItems, setStateItems] = useState([
+  { label: 'Alabama (AL)', value: 'AL' },
+  { label: 'Alaska (AK)', value: 'AK' },
+  { label: 'Arizona (AZ)', value: 'AZ' },
+  { label: 'Arkansas (AR)', value: 'AR' },
+  { label: 'California (CA)', value: 'CA' },
+  { label: 'Colorado (CO)', value: 'CO' },
+  { label: 'Connecticut (CT)', value: 'CT' },
+  { label: 'Delaware (DE)', value: 'DE' },
+  { label: 'Florida (FL)', value: 'FL' },
+  { label: 'Georgia (GA)', value: 'GA' },
+  { label: 'Hawaii (HI)', value: 'HI' },
+  { label: 'Idaho (ID)', value: 'ID' },
+  { label: 'Illinois (IL)', value: 'IL' },
+  { label: 'Indiana (IN)', value: 'IN' },
+  { label: 'Iowa (IA)', value: 'IA' },
+  { label: 'Kansas (KS)', value: 'KS' },
+  { label: 'Kentucky (KY)', value: 'KY' },
+  { label: 'Louisiana (LA)', value: 'LA' },
+  { label: 'Maine (ME)', value: 'ME' },
+  { label: 'Maryland (MD)', value: 'MD' },
+  { label: 'Massachusetts (MA)', value: 'MA' },
+  { label: 'Michigan (MI)', value: 'MI' },
+  { label: 'Minnesota (MN)', value: 'MN' },
+  { label: 'Mississippi (MS)', value: 'MS' },
+  { label: 'Missouri (MO)', value: 'MO' },
+  { label: 'Montana (MT)', value: 'MT' },
+  { label: 'Nebraska (NE)', value: 'NE' },
+  { label: 'Nevada (NV)', value: 'NV' },
+  { label: 'New Hampshire (NH)', value: 'NH' },
+  { label: 'New Jersey (NJ)', value: 'NJ' },
+  { label: 'New Mexico (NM)', value: 'NM' },
+  { label: 'New York (NY)', value: 'NY' },
+  { label: 'North Carolina (NC)', value: 'NC' },
+  { label: 'North Dakota (ND)', value: 'ND' },
+  { label: 'Ohio (OH)', value: 'OH' },
+  { label: 'Oklahoma (OK)', value: 'OK' },
+  { label: 'Oregon (OR)', value: 'OR' },
+  { label: 'Pennsylvania (PA)', value: 'PA' },
+  { label: 'Rhode Island (RI)', value: 'RI' },
+  { label: 'South Carolina (SC)', value: 'SC' },
+  { label: 'South Dakota (SD)', value: 'SD' },
+  { label: 'Tennessee (TN)', value: 'TN' },
+  { label: 'Texas (TX)', value: 'TX' },
+  { label: 'Utah (UT)', value: 'UT' },
+  { label: 'Vermont (VT)', value: 'VT' },
+  { label: 'Virginia (VA)', value: 'VA' },
+  { label: 'Washington (WA)', value: 'WA' },
+  { label: 'West Virginia (WV)', value: 'WV' },
+  { label: 'Wisconsin (WI)', value: 'WI' },
+  { label: 'Wyoming (WY)', value: 'WY' },
+]);
+
 
 
   const handleImagePick = async () => {
@@ -70,7 +126,41 @@ export default function LeadDetailScreen({ route }) {
     setUpdatedLead({ ...updatedLead, images: newImages });
   };
 
+  const validateFields = () => {
+    const newErrors = {};
+    const { address, city, state, zip } = updatedLead;
+  
+    if (!address?.trim()) newErrors.address = "Address is required.";
+    if (!city?.trim()) newErrors.city = "City is required.";
+  
+    if (!state?.trim()) {
+      newErrors.state = "State is required.";
+    } else if (!/^[A-Z]{2}$/.test(state.trim().toUpperCase())) {
+      newErrors.state = "Use 2-letter state code (e.g., CA)";
+    }
+  
+    if (!zip?.trim()) {
+      newErrors.zip = "Zip code is required.";
+    } else if (!/^\d{5}$/.test(zip.trim())) {
+      newErrors.zip = "Zip must be 5 digits.";
+    }
+  
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleModalSave = () => {
+    if (!validateFields()) return;
+    setModalVisible(false);
+  }
+  
+
   const handleSave = async () => {
+    if (!validateFields()) {
+      Alert.alert("Invalid input", "Please fix the errors in the form.");
+      return;
+    }
+
     const hasChanges = JSON.stringify(lead) !== JSON.stringify(updatedLead);
     if (!hasChanges) {
       navigation.goBack(); // No changes, just go back
@@ -145,6 +235,8 @@ export default function LeadDetailScreen({ route }) {
     }
   };
 
+  
+
   return (
     <KeyboardAvoidingView
     style={{ flex: 1 }}
@@ -163,8 +255,9 @@ export default function LeadDetailScreen({ route }) {
         </TouchableOpacity>
 
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-          {updatedLead.name || 'Unnamed Property'}
+          {updatedLead.name || updatedLead.address || 'Unnamed Property'}
         </Text>
+
 
         <TouchableOpacity onPress={() => setModalVisible(true)}>
           <Ionicons name="pencil" size={22} color={colors.text} />
@@ -242,28 +335,89 @@ export default function LeadDetailScreen({ route }) {
 
       {/* Edit Fields Modal */}
       <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
-            {["name", "address", "city", "state", "zip", "owner"].map(field => (
+  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <View style={styles.modalOverlay}>
+      <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+        <ScrollView
+          style={{ maxHeight: '%' }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {["name", "address", "city", "zip", "owner"].map((field) => (
+            <View key={field}>
               <TextInput
-                key={field}
                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                 placeholderTextColor={colors.text + "99"}
                 value={updatedLead[field]}
-                onChangeText={(text) => setUpdatedLead({ ...updatedLead, [field]: text })}
-                style={[styles.input, {
-                  borderColor: colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.background,
-                }]}
+                onChangeText={(text) =>
+                  setUpdatedLead({ ...updatedLead, [field]: text })
+                }
+                style={[
+                  styles.input,
+                  {
+                    borderColor: colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.background,
+                  },
+                ]}
               />
-            ))}
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.saveBtn}>
-              <Text style={styles.saveText}>Save</Text>
-            </TouchableOpacity>
+              {errors[field] && (
+                <Text
+                  style={{
+                    color: "red",
+                    marginTop: -10,
+                    marginBottom: 10,
+                    fontSize: 12,
+                  }}
+                >
+                  {errors[field]}
+                </Text>
+              )}
+            </View>
+          ))}
+
+          <View style={{ zIndex: 1000 }}>
+            <DropDownPicker
+              open={stateOpen}
+              value={updatedLead.state}
+              items={stateItems}
+              setOpen={setStateOpen}
+              setValue={(val) =>
+                setUpdatedLead({ ...updatedLead, state: val() })
+              }
+              setItems={setStateItems}
+              searchable
+              placeholder="Select a state..."
+              placeholderStyle={{ color: colors.text + "99" }}
+              style={{
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+                marginBottom: 10,
+              }}
+              dropDownContainerStyle={{
+                backgroundColor: colors.card,
+                zIndex: 9999,
+              }}
+              textStyle={{ color: colors.text }}
+            />
+            {errors.state && (
+              <Text
+                style={{ color: "red", marginBottom: 10, fontSize: 12 }}
+              >
+                {errors.state}
+              </Text>
+            )}
           </View>
-        </View>
-      </Modal>
+
+          <TouchableOpacity onPress={handleModalSave} style={styles.saveBtn}>
+            <Text style={styles.saveText}>Save</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </View>
+  </TouchableWithoutFeedback>
+</Modal>
+
     </ScrollView>
     </TouchableWithoutFeedback>
   </KeyboardAvoidingView>
@@ -358,10 +512,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
+  
   modalContainer: {
-    width: '90%',
+    width: '100%',
+    maxHeight: '90%',
     padding: 20,
     borderRadius: 12,
+    backgroundColor: '#fff',
   },
+  
 });

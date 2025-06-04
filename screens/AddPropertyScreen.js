@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -25,6 +26,8 @@ import { SERVER_URL } from '@env';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useDataContext } from '../DataContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DropDownPicker from 'react-native-dropdown-picker';
+
 
 
 const API_URL = `${SERVER_URL}/api/leads`;
@@ -48,7 +51,64 @@ const longitude = location?.longitude;
   const [owner, setOwner] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+const [stateItems, setStateItems] = useState([
+  { label: 'Alabama (AL)', value: 'AL' },
+  { label: 'Alaska (AK)', value: 'AK' },
+  { label: 'Arizona (AZ)', value: 'AZ' },
+  { label: 'Arkansas (AR)', value: 'AR' },
+  { label: 'California (CA)', value: 'CA' },
+  { label: 'Colorado (CO)', value: 'CO' },
+  { label: 'Connecticut (CT)', value: 'CT' },
+  { label: 'Delaware (DE)', value: 'DE' },
+  { label: 'Florida (FL)', value: 'FL' },
+  { label: 'Georgia (GA)', value: 'GA' },
+  { label: 'Hawaii (HI)', value: 'HI' },
+  { label: 'Idaho (ID)', value: 'ID' },
+  { label: 'Illinois (IL)', value: 'IL' },
+  { label: 'Indiana (IN)', value: 'IN' },
+  { label: 'Iowa (IA)', value: 'IA' },
+  { label: 'Kansas (KS)', value: 'KS' },
+  { label: 'Kentucky (KY)', value: 'KY' },
+  { label: 'Louisiana (LA)', value: 'LA' },
+  { label: 'Maine (ME)', value: 'ME' },
+  { label: 'Maryland (MD)', value: 'MD' },
+  { label: 'Massachusetts (MA)', value: 'MA' },
+  { label: 'Michigan (MI)', value: 'MI' },
+  { label: 'Minnesota (MN)', value: 'MN' },
+  { label: 'Mississippi (MS)', value: 'MS' },
+  { label: 'Missouri (MO)', value: 'MO' },
+  { label: 'Montana (MT)', value: 'MT' },
+  { label: 'Nebraska (NE)', value: 'NE' },
+  { label: 'Nevada (NV)', value: 'NV' },
+  { label: 'New Hampshire (NH)', value: 'NH' },
+  { label: 'New Jersey (NJ)', value: 'NJ' },
+  { label: 'New Mexico (NM)', value: 'NM' },
+  { label: 'New York (NY)', value: 'NY' },
+  { label: 'North Carolina (NC)', value: 'NC' },
+  { label: 'North Dakota (ND)', value: 'ND' },
+  { label: 'Ohio (OH)', value: 'OH' },
+  { label: 'Oklahoma (OK)', value: 'OK' },
+  { label: 'Oregon (OR)', value: 'OR' },
+  { label: 'Pennsylvania (PA)', value: 'PA' },
+  { label: 'Rhode Island (RI)', value: 'RI' },
+  { label: 'South Carolina (SC)', value: 'SC' },
+  { label: 'South Dakota (SD)', value: 'SD' },
+  { label: 'Tennessee (TN)', value: 'TN' },
+  { label: 'Texas (TX)', value: 'TX' },
+  { label: 'Utah (UT)', value: 'UT' },
+  { label: 'Vermont (VT)', value: 'VT' },
+  { label: 'Virginia (VA)', value: 'VA' },
+  { label: 'Washington (WA)', value: 'WA' },
+  { label: 'West Virginia (WV)', value: 'WV' },
+  { label: 'Wisconsin (WI)', value: 'WI' },
+  { label: 'Wyoming (WY)', value: 'WY' },
+]);
+const [rawAssets, setRawAssets] = useState([]);
+const scrollRef = useRef();
+
 
   useEffect(() => {
     console.log("Route params on load:", route.params);
@@ -74,8 +134,19 @@ const longitude = location?.longitude;
     }
   };
 
+
   initFromParams();
 }, [route.params]);
+
+useEffect(() => {
+  if (images.length > 0) {
+    // Give it a tick so layout updates first
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100); // 100ms delay ensures layout is updated
+  }
+}, [images]);
+
 
 const extractDecimalCoords = (exif) => {
     let lat = exif.GPSLatitude;
@@ -90,6 +161,28 @@ const extractDecimalCoords = (exif) => {
     return null;
   };
 
+  const validateInputs = () => {
+    const newErrors = {};
+  
+    if (!address.trim()) newErrors.address = "Address is required.";
+    if (!city.trim()) newErrors.city = "City is required.";
+    if (!state.trim()) {
+      newErrors.state = "State is required.";
+    } else if (!/^[A-Z]{2}$/.test(state.trim().toUpperCase())) {
+      newErrors.state = "Use 2-letter state code (e.g., CA)";
+    }
+  
+    if (!zip.trim()) {
+      newErrors.zip = "Zip code is required.";
+    } else if (!/^\d{5}$/.test(zip.trim())) {
+      newErrors.zip = "Zip must be 5 digits.";
+    }
+  
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -101,8 +194,10 @@ const extractDecimalCoords = (exif) => {
   
     if (!result.canceled && result.assets.length > 0) {
       const validImages = [];
+      const rawSelected = [];
   
       for (const asset of result.assets) {
+        rawSelected.push(asset); // Save original with EXIF
         let usedCoords = false;
   
         // 1️⃣ Try EXIF GPS metadata
@@ -140,11 +235,15 @@ const extractDecimalCoords = (exif) => {
         } catch (e) {
           console.error("❌ Image resize failed:", e);
         }
+
+        setRawAssets((prev) => [...prev, ...rawSelected]);
+
       }
   
       if (validImages.length > 0) {
         setImages((prev) => [...prev, ...validImages]);
       }
+
     }
   };
   
@@ -217,17 +316,16 @@ const extractDecimalCoords = (exif) => {
   };
 
   const handleAddProperty = async () => {
-    const storedUser = await SecureStore.getItemAsync("user");
-    console.log(storedUser);
-    if (!storedUser) return;
-
-    const { email, id: userId } = JSON.parse(storedUser);
-
-    if (!address || !city || !state || !zip) {
-      Alert.alert("Missing fields", "Please fill in all required fields.");
+    if (!validateInputs()) {
+      Alert.alert("Invalid input", "Please correct the highlighted errors.");
       return;
     }
-
+  
+    const storedUser = await SecureStore.getItemAsync("user");
+    if (!storedUser) return;
+  
+    const { email, id: userId } = JSON.parse(storedUser);
+  
     const newLead = {
       name,
       address,
@@ -240,7 +338,7 @@ const extractDecimalCoords = (exif) => {
       email,
       userId,
     };
-
+  
     try {
       setLoading(true);
       const response = await fetch(API_URL, {
@@ -249,9 +347,8 @@ const extractDecimalCoords = (exif) => {
         body: JSON.stringify(newLead),
       });
       const data = await response.json();
-      console.log(response);
       if (!response.ok) throw new Error(data.error || "Add failed");
-
+  
       Alert.alert("Success", "Property added successfully!");
       updateStats();
       navigation.reset({
@@ -260,7 +357,7 @@ const extractDecimalCoords = (exif) => {
           {
             name: "AppTabs",
             state: {
-              index: 2, // "Leads" tab
+              index: 2,
               routes: [
                 { name: "Drive" },
                 { name: "Home" },
@@ -274,7 +371,7 @@ const extractDecimalCoords = (exif) => {
           }
         ]
       });
-
+  
     } catch (err) {
       console.error("Error adding property:", err);
       Alert.alert("Error", "Failed to add property.");
@@ -282,6 +379,7 @@ const extractDecimalCoords = (exif) => {
       setLoading(false);
     }
   };
+  
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: colors.background }]}>
@@ -292,11 +390,12 @@ const extractDecimalCoords = (exif) => {
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.container,
             {
               backgroundColor: colors.background,
-              paddingBottom: insets.bottom + 30, // 80 = custom safe spacing above nav bar
+              paddingBottom: Math.max(insets.bottom, 16) + 10
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -319,8 +418,35 @@ const extractDecimalCoords = (exif) => {
                   <Image source={{ uri: imgUri }} style={styles.image} />
                   <TouchableOpacity
                     onPress={() => {
-                      setImages(prev => prev.filter((_, i) => i !== idx));
+                      const updatedImages = images.filter((_, i) => i !== idx);
+                      const updatedRawAssets = rawAssets.filter((_, i) => i !== idx);
+                      setImages(updatedImages);
+                      setRawAssets(updatedRawAssets);
+                    
+                      if (updatedImages.length === 0 && from !== "drive") {
+                        setAddress("");
+                        setCity("");
+                        setState("");
+                        setZip("");
+                      } else if (from !== "drive") {
+                        // Try to extract coords from the new first image
+                        const first = updatedRawAssets[0];
+                        const coords = extractDecimalCoords(first?.exif || {});
+                        if (coords) getAddressFromCoords(coords.lat, coords.lng);
+                        else {
+                          // fallback to current location if needed
+                          const fetchLocation = async () => {
+                            const { status } = await Location.requestForegroundPermissionsAsync();
+                            if (status === "granted") {
+                              const loc = await Location.getCurrentPositionAsync({});
+                              getAddressFromCoords(loc.coords.latitude, loc.coords.longitude);
+                            }
+                          };
+                          fetchLocation();
+                        }
+                      }
                     }}
+                    
                     style={styles.removeButton}
                   >
                     <Text style={{ color: "white", fontWeight: "bold" }}>✕</Text>
@@ -329,26 +455,77 @@ const extractDecimalCoords = (exif) => {
               ))}
             </ScrollView>
   
-            {[{ label: "Name", val: name, set: setName },
-              { label: "Address", val: address, set: setAddress },
-              { label: "City", val: city, set: setCity },
-              { label: "State", val: state, set: setState },
-              { label: "Zip", val: zip, set: setZip },
-              { label: "Owner", val: owner, set: setOwner },
-            ].map(({ label, val, set }, idx) => (
-              <TextInput
-                key={idx}
-                placeholder={label}
-                placeholderTextColor='#9CA3AF'
-                style={[styles.input, {
-                  borderColor: colors.border,
-                  color: colors.text,
-                  backgroundColor: colors.card,
-                }]}
-                value={val}
-                onChangeText={set}
-              />
+            {[
+              { label: "Property Name", val: name, set: setName, key: "name" },
+              { label: "Address", val: address, set: setAddress, key: "address" },
+              { label: "City", val: city, set: setCity, key: "city" },
+            ].map(({ label, val, set, key }, idx) => (
+              <View key={idx}>
+                <TextInput
+                  placeholder={label}
+                  placeholderTextColor='#9CA3AF'
+                  style={[styles.input, {
+                    borderColor: colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.card,
+                  }]}
+                  value={val}
+                  onChangeText={set}
+                />
+                {errors[key] && (
+                  <Text style={{ color: 'red', marginTop: 4, marginLeft: 2 }}>
+                    {errors[key]}
+                  </Text>
+                )}
+              </View>
             ))}
+
+            {/* ✅ State Dropdown goes here outside the map */}
+            <View style={{ zIndex: 1000, marginTop: 10 }}>
+            <DropDownPicker
+              open={open}
+              value={state}
+              items={stateItems}
+              setOpen={setOpen}
+              setValue={setState}
+              setItems={setStateItems}
+              searchable={true}
+              placeholder="Select a state..."
+              placeholderStyle={{ color: '#9CA3AF' }} // 👈 This line sets the placeholder color
+              style={{ borderColor: colors.border, backgroundColor: colors.card }}
+              textStyle={{ color: colors.text }}
+              dropDownContainerStyle={{ backgroundColor: colors.card }}
+            />
+              {errors.state && (
+                <Text style={{ color: 'red', marginTop: 4 }}>{errors.state}</Text>
+              )}
+            </View>
+
+            {[
+              { label: "Zip", val: zip, set: setZip, key: "zip" },
+              { label: "Owner", val: owner, set: setOwner, key: "owner" },
+            ].map(({ label, val, set, key }, idx) => (
+              <View key={idx}>
+                <TextInput
+                  placeholder={label}
+                  placeholderTextColor='#9CA3AF'
+                  style={[styles.input, {
+                    borderColor: colors.border,
+                    color: colors.text,
+                    backgroundColor: colors.card,
+                  }]}
+                  value={val}
+                  onChangeText={set}
+                />
+                {errors[key] && (
+                  <Text style={{ color: 'red', marginTop: 4, marginLeft: 2 }}>
+                    {errors[key]}
+                  </Text>
+                )}
+              </View>
+            ))}
+
+
   
             <TextInput
               placeholder="Notes"
@@ -390,9 +567,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
   imageButton: { backgroundColor: "#7C3AED", padding: 12, borderRadius: 8, marginBottom: 10, alignItems: "center" },
   imageButtonText: { color: "white", fontWeight: "bold" },
-  imageScroll: { marginVertical: 10 },
-  image: { width: 100, height: 100, marginRight: 10, borderRadius: 10 },
-  input: { borderColor: "#ccc", borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 10 },
   submitButton: { backgroundColor: "#7C3AED", padding: 15, borderRadius: 8, alignItems: "center", marginTop: 20 },
   submitText: { color: "white", fontSize: 16, fontWeight: "bold" },
   removeButton: {
@@ -407,6 +581,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 10,
   },
+  input: {
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    justifyContent: 'center',
+  },
+  imageScroll: {
+    marginVertical: 10,
+    paddingVertical: 6,
+  },
+  image: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+    marginRight: 10,
+    marginTop: 6,
+  },
+  
+  
   
 });
 

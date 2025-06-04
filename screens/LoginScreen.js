@@ -39,42 +39,57 @@ export default function LoginScreen({ navigation }) {
         return;
       }
   
-      const payload = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: firebaseUser.email.split("@")[0], // Default fallback
-        picture: null, // You can extend this if needed
-      };
+      const normalizedEmail = firebaseUser.email.toLowerCase();
+      const fallbackName = normalizedEmail.split("@")[0];
   
-      // 🔁 Send to backend: create or update
-      const res = await fetch(`${SERVER_URL}/api/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // 1️⃣ Check if user exists by email
+      const checkRes = await fetch(`${SERVER_URL}/api/users/${encodeURIComponent(normalizedEmail)}`);
+      const checkData = await checkRes.json();
   
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Backend error: ${errorText}`);
+      let userId;
+      if (checkData?.userId && checkData.userId !== -1) {
+        userId = checkData.userId;
+        console.log("✅ Existing user ID found:", userId);
+      } else {
+        // 2️⃣ If not found, create the user
+        console.log("🆕 Creating new user with Firebase UID");
+        const createRes = await fetch(`${SERVER_URL}/api/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: firebaseUser.uid,
+            email: normalizedEmail,
+            name: fallbackName,
+            picture: null,
+          }),
+        });
+  
+        if (!createRes.ok) {
+          const errorText = await createRes.text();
+          throw new Error(`Backend error: ${errorText}`);
+        }
+  
+        const newUser = await createRes.json();
+        userId = newUser.id;
       }
   
-      const savedUser = await res.json();
-  
-      // 💾 Save user data locally
+      // 3️⃣ Store the user in SecureStore
       await SecureStore.setItemAsync("user", JSON.stringify({
-        id: savedUser.id,
-        email: savedUser.email,
-        name: savedUser.name,
-        picture: savedUser.picture,
+        id: userId,
+        email: normalizedEmail,
+        name: fallbackName,
+        picture: null,
       }));
   
-      // 🔀 Navigate to app
+      // 4️⃣ Navigate into app
       navigation.replace("AppTabs");
+  
     } catch (error) {
       console.error("Login error:", error);
       Alert.alert("Login Failed", error.message);
     }
   };
+  
   
   
 

@@ -322,12 +322,22 @@ export default function LeadListScreen() {
       })
     }
   >
-      {item.images?.[0] && (
+      {item.images?.[0] ? (
         <Image source={{ uri: item.images[0] }} style={styles.image} resizeMode="cover" />
+      ) : (
+        <View style={[styles.image, { backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: '#6B7280', fontSize: 14 }}>No Image</Text>
+        </View>
       )}
+
       <View style={styles.cardContent}>
-      <Text style={[styles.address, { color: colors.text }]}>{item.name}</Text>
-        <Text style={[styles.meta, { color: colors.text }]}>{`Owner: ${item.owner}`}</Text>
+      <Text style={[styles.address, { color: colors.text }]}>
+        {item.name || item.address || 'Unnamed'}
+      </Text>
+      <Text style={[styles.meta, { color: colors.text }]}>
+        {`Owner: ${item.owner || 'None'}`}
+      </Text>
+
         <Text style={[styles.meta, { color: colors.text }]}>{`Status: ${item.status}`}</Text>
       </View>
     </TouchableOpacity>
@@ -477,7 +487,10 @@ export default function LeadListScreen() {
                         </View>
                     )}
                       <View style={{ padding: 10 }}>
-                        <Text style={{ fontWeight: 'bold' }}>{item.name || item.address}</Text>
+                      <Text style={{ fontWeight: 'bold' }}>
+                        {item.name || item.address || 'Unnamed'}
+                      </Text>
+
                         <Text>{item.city}</Text>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
                           <Text style={{ lineHeight: 20 }}>Status: {item.status}</Text>
